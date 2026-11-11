@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fahrplan">
 <title>Fahrplananzeige Führerraum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,7 +33,7 @@
   --orig-filter:none;
   --font-display:"IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",Arial,sans-serif;
   --font-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
-  --c-v:3.1em; --c-km:3.6em; --c-g:1.3em; --c-t:3.7em;
+  --c-vz:2.25em; --c-band:1.9em; --c-v:calc(var(--c-vz) + var(--c-band)); --c-km:3.6em; --c-g:1.3em; --c-t:3.7em;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -75,6 +78,7 @@ button{font:inherit;color:inherit}
 .feld .wert{display:block;font-family:var(--font-display);font-weight:600;font-size:1.1rem;overflow-wrap:anywhere}
 #k-datum,#k-zeit{white-space:nowrap}
 @media (max-width:359px){.feld{padding-left:.3rem;padding-right:.3rem}.feld .wert{font-size:1rem}}
+@media (max-width:359px){:root{--c-band:1.3em}}
 
 .status{display:flex;justify-content:space-between;gap:.2rem .75rem;flex-wrap:wrap;min-height:1.75rem;align-items:center;
   padding:.2rem .45rem;border:1px solid var(--line);border-top:0;background:var(--panel);
@@ -98,15 +102,18 @@ button{font:inherit;color:inherit}
 
 .z{min-height:1.9em;border-top:1px solid var(--line-soft)}
 .c{padding:.18em .35em;display:flex;align-items:center;min-width:0}
-.c.v{flex-direction:column;justify-content:center;align-items:flex-end;border-right:3px solid var(--ink);font-family:var(--font-display);font-weight:700;font-size:1.08em;line-height:1.1}
+.c.v{flex-direction:column;justify-content:center;align-items:flex-end;position:relative;padding-right:calc(var(--c-band) / 1.08 + .25em);font-family:var(--font-display);font-weight:700;font-size:1.08em;line-height:1.1}
+/* Geschwindigkeitslinie: rechts bei der Höchstgeschwindigkeit des Zuges, weiter links bei weniger; Stufe an jedem Wechsel */
+.c.v::after{content:"";position:absolute;top:-1px;bottom:0;width:3px;background:var(--ink);right:calc((1 - var(--vx,1)) * (var(--c-band) / 1.08 - 3px))}
+.z.vstufe .c.v::before{content:"";position:absolute;bottom:-1px;height:3px;background:var(--ink);right:calc((1 - var(--vb,1)) * (var(--c-band) / 1.08 - 3px));width:calc((var(--vb,1) - var(--va,1)) * (var(--c-band) / 1.08 - 3px) + 3px)}
 .c.km{flex-direction:column;justify-content:center;align-items:flex-end;color:var(--ink-soft);font-size:.9em;line-height:1.2}
 .c.g{padding:0;justify-content:center;position:relative}
 .c.tx{display:block;font-family:var(--font-display);font-size:1.02em;overflow-wrap:anywhere}
 .c.an,.c.ab{justify-content:flex-end;font-size:.9em;border-left:1px solid var(--line-soft);font-family:var(--font-display);font-weight:600}
 .z.bst .c.tx .t0{font-weight:700;font-size:1.08em}
 .z.info .c.tx{font-weight:600;color:var(--ink-soft)}
-.z.wechsel .c.v{box-shadow:inset 0 -2px 0 var(--ink)}
-.z.wechsel.strich .c.v{box-shadow:none;border-bottom:2px dashed var(--ink)}
+.z.wechsel .c.v{background:linear-gradient(var(--ink),var(--ink)) left bottom / calc(100% - var(--c-band) / 1.08) 2px no-repeat}
+.z.wechsel.strich .c.v{background:repeating-linear-gradient(90deg,var(--ink) 0 5px,transparent 5px 9px) left bottom / calc(100% - var(--c-band) / 1.08) 2px no-repeat}
 .vz.inv,.vg.inv,.kmw.inv{background:var(--ink);color:var(--panel);padding:0 .22em}
 .vg{font-size:.8em;font-weight:600}
 .kmw{color:var(--ink)}
@@ -115,6 +122,9 @@ button{font:inherit;color:inherit}
 .hw{white-space:nowrap;font-weight:600}
 .fn{display:block;font-size:.82em;color:var(--ink-soft);font-style:italic}
 .halt{font-weight:700;margin-right:.12em}
+.gg{color:var(--marker)}
+.leerstand{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;padding:1rem;text-align:center;color:var(--ink-soft)}
+.leerstand p{margin:0;font-family:var(--font-display);font-size:1.1rem}
 .osb{display:inline-block;width:1.05em;height:1.05em;line-height:1.05em;border-radius:50%;background:var(--ink);color:var(--panel);text-align:center;font-size:.78em;font-weight:700;vertical-align:.08em}
 .kasten{display:inline-block;border:1.5px solid var(--ink);padding:0 .2em;font-size:.8em;font-weight:700;line-height:1.15;vertical-align:.05em}
 .durch{background-image:linear-gradient(to top right,transparent calc(50% - 1px),currentColor calc(50% - 1px),currentColor calc(50% + 1px),transparent calc(50% + 1px))}
@@ -149,10 +159,13 @@ button{font:inherit;color:inherit}
 .marker::after{content:"";position:absolute;left:0;top:-2px;width:calc(var(--c-v) + var(--c-km) + var(--c-g));border-top:2px solid var(--marker)}
 .marker::before{content:"";position:absolute;left:0;top:calc(-.5em - 1px);border-style:solid;border-width:.5em 0 .5em .8em;border-color:transparent transparent transparent var(--marker)}
 
-.wdh{position:absolute;left:0;bottom:0;display:flex;align-items:stretch;pointer-events:none;z-index:2}
+/* Feld mit der geltenden Geschwindigkeit; antippen führt nach dem Blättern zurück zum Ortsmarker */
+.wdh{position:absolute;left:0;bottom:0;display:flex;align-items:stretch;z-index:2;margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;text-align:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.wdh:focus-visible{outline:2px solid var(--marker);outline-offset:2px}
+.wdh.weg .feldv{box-shadow:0 0 0 3px var(--marker)}
 .wdh .feldv{min-width:var(--c-v);background:var(--repeat);color:var(--repeat-ink);font-family:var(--font-display);font-weight:700;font-size:1.25em;
   text-align:right;padding:.15em .3em;border-top:2px solid var(--ink);border-right:3px solid var(--ink)}
-.wdh .feldv .gg{font-size:.7em;margin-left:.35em}
+.wdh .feldv .gg{font-size:.7em;margin-left:.35em;color:inherit}
 .wdh .feldla{background:var(--la-bg);color:var(--la-ink);border:1px solid var(--la);border-left:.3rem solid var(--la);font-family:var(--font-display);font-weight:700;padding:.15em .45em;display:flex;align-items:center}
 
 .tasten{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:.25rem;padding:.4rem 0 .6rem}
@@ -197,6 +210,12 @@ button{font:inherit;color:inherit}
 .origwrap canvas{display:block;filter:var(--orig-filter)}
 details.gruppe > summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
 details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-offset:2px}
+.liste.halte li span:first-child{flex:1;min-width:0}
+.zt{min-width:3.6em;text-align:right;font-family:var(--font-display);font-weight:600}
+.haltekopf{display:flex;gap:1rem;font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+.haltekopf span:first-child{flex:1}
+.haltekopf .zt{font-family:inherit;font-weight:400}
+.knopf.lang{text-align:left;white-space:normal;max-width:100%}
 .liste li.block{display:block}
 .liste li.block span{display:block}
 .quelle{font-size:.74rem;color:var(--ink-soft);max-width:65ch;margin:0}
@@ -207,11 +226,10 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
 <body>
 <div class="geraet">
   <div class="hinweis">
-    <span class="chip achtung" id="ch-demo">Demo</span>
     <span class="chip" id="ch-datum" hidden></span>
-    <span class="chip achtung" id="ch-probe" hidden>Probelauf</span>
+    <span class="chip achtung" id="ch-gw" hidden>Gegengleis</span>
     <span class="chip" id="ch-la">La nicht geladen</span>
-    <span id="hinweistext">Inoffizielle Anzeige. Maßgebend bleiben Fahrplan und La.</span>
+    <span id="hinweistext">Inoffizielle Anzeige. Maßgebend bleiben Fahrplan-PDF und La.</span>
   </div>
 
   <header class="kopf">
@@ -231,10 +249,14 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     <div class="sicht" id="sicht" tabindex="0" aria-label="Fahrplan, von unten nach oben zu lesen">
       <div class="bahn" id="bahn"></div>
     </div>
-    <div class="wdh" aria-hidden="true">
-      <div class="feldv num" id="wdh-v"></div>
-      <div class="feldla num" id="wdh-la" hidden></div>
+    <div class="leerstand" id="leerstand">
+      <p>Kein Fahrplan geladen.</p>
+      <button class="knopf" type="button" id="leer-laden">Fahrplan-PDF laden</button>
     </div>
+    <button class="wdh" type="button" id="wdh" aria-label="Zurück zum Ortsmarker">
+      <span class="feldv num" id="wdh-v"></span>
+      <span class="feldla num" id="wdh-la" hidden></span>
+    </button>
 
     <section class="blatt" id="blatt-zug" role="dialog" aria-labelledby="h-zug" hidden>
       <div class="blattkopf"><h2 id="h-zug">Fahrplan laden</h2><button class="knopf" type="button" data-zu="t-zug">Schließen</button></div>
@@ -242,9 +264,9 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <span class="gl">Blattfahrplan aus der EBuLa-Rückfallebene</span>
         <div class="reihe">
           <label class="knopf dateiknopf" for="datei">PDF auswählen<input type="file" id="datei" accept="application/pdf,.pdf"></label>
-          <button class="knopf" type="button" id="demo-laden">Demo-Fahrplan zeigen</button>
+          <button class="knopf" type="button" id="sitzung-weg" hidden>Fahrplan und La löschen</button>
         </div>
-        <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden A4- und A5-Ausgabe.</p>
+        <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden A4- und A5-Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
       </div>
       <div class="meldung" id="lade-meldung" role="status" hidden></div>
       <div class="gruppe" id="bericht" hidden>
@@ -260,7 +282,11 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     <section class="blatt" id="blatt-fsd" role="dialog" aria-labelledby="h-fsd" hidden>
       <div class="blattkopf"><h2 id="h-fsd">Fahrplanstammdaten</h2><button class="knopf" type="button" data-zu="t-fsd">Schließen</button></div>
       <dl class="stamm" id="stamm"></dl>
-      <div class="gruppe"><span class="gl">Halte, von unten nach oben</span><ul class="liste umgekehrt" id="halteliste"></ul></div>
+      <div class="gruppe"><span class="gl">Halte, von unten nach oben</span>
+        <div class="haltekopf" aria-hidden="true"><span>Betriebsstelle</span><span class="zt">An</span><span class="zt">Ab</span></div>
+        <ul class="liste umgekehrt halte" id="halteliste"></ul>
+        <p class="klar">Das Zeichen vor der Ankunftszeit steht so im Blattfahrplan.</p>
+      </div>
     </section>
 
     <section class="blatt" id="blatt-lw" role="dialog" aria-labelledby="h-lw" hidden>
@@ -285,11 +311,12 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <ul class="liste" id="la-docs"></ul>
       </div>
       <div class="gruppe" id="la-filtergruppe" hidden>
-        <span class="gl">Ausblenden</span>
-        <div class="reihe">
-          <button class="knopf" type="button" id="lf-absturz" aria-pressed="false">Absturzgefahr</button>
-          <button class="knopf" type="button" id="lf-gegen" aria-pressed="false">Nur Gegengleis</button>
-        </div>
+        <span class="gl" id="lf-zeichentitel">Ausblenden nach Zeichen, nur Einträge ohne Geschwindigkeit</span>
+        <div class="reihe" id="lf-zeichen"></div>
+        <span class="gl" id="lf-geltungtitel">Ausblenden nach Geltung, auch Einträge mit Geschwindigkeit</span>
+        <div class="reihe" id="lf-geltung"></div>
+        <span class="gl">Ausblenden nach Stand</span>
+        <div class="reihe"><button class="knopf" type="button" id="lf-ruht" aria-pressed="false">Nicht in Kraft</button></div>
         <p class="klar" id="lf-text"></p>
       </div>
       <div class="gruppe" id="la-weggruppe" hidden>
@@ -356,18 +383,9 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
           <span class="wertgross num" id="v-wert"></span>
           <button class="knopf" type="button" id="v-plus" aria-label="Verspätung um eine Minute erhöhen">+ 1 min</button>
           <button class="knopf" type="button" id="v-null">Auf 0 setzen</button>
+          <button class="knopf" type="button" id="t-pause" aria-pressed="false">Marker anhalten</button>
         </div>
         <p class="klar">Mit ▲ und ▼ setzt du den Marker auf die Zeile, an der der Zug gerade ist. Die Verspätung ergibt sich daraus.</p>
-      </div>
-      <div class="gruppe">
-        <span class="gl">Uhr</span>
-        <div class="reihe">
-          <button class="knopf" type="button" id="u-echt" aria-pressed="true">Echtzeit</button>
-          <button class="knopf" type="button" data-probe="1" aria-pressed="false">Probelauf × 1</button>
-          <button class="knopf" type="button" data-probe="10" aria-pressed="false">× 10</button>
-          <button class="knopf" type="button" data-probe="60" aria-pressed="false">× 60</button>
-        </div>
-        <p class="klar">Der Probelauf stellt die Uhr eine Minute vor die Abfahrt und lässt sie schneller laufen. Im Dienst gilt nur Echtzeit.</p>
       </div>
       <div class="gruppe">
         <span class="gl">Anzeige</span>
@@ -375,8 +393,10 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
           <button class="knopf" type="button" id="a-tag" aria-pressed="false">Tag</button>
           <button class="knopf" type="button" id="a-nacht" aria-pressed="false">Nacht</button>
           <button class="knopf" type="button" id="a-wach" aria-pressed="false">Bildschirm anlassen</button>
+          <button class="knopf" type="button" id="a-voll" aria-pressed="false">Vollbild</button>
         </div>
         <p class="klar" id="a-wachtext" hidden></p>
+        <p class="klar" id="a-volltext" hidden></p>
       </div>
     </section>
   </div>
@@ -392,9 +412,9 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     <button class="taste" type="button" id="t-fsd" aria-pressed="false">FSD</button>
     <button class="taste" type="button" id="t-lw" aria-pressed="false">LW</button>
     <button class="taste" type="button" id="t-la" aria-pressed="false">La</button>
+    <button class="taste" type="button" id="t-gw" aria-pressed="false" aria-label="Fahrt auf dem Gegengleis">GW</button>
     <button class="taste" type="button" id="t-ab" aria-label="Marker eine Zeile zurück">▼</button>
     <button class="taste" type="button" id="t-auf" aria-label="Marker eine Zeile vor">▲</button>
-    <button class="taste" type="button" id="t-pause" aria-pressed="false">Pause</button>
     <button class="taste" type="button" id="t-zeit" aria-pressed="false">Zeit</button>
   </nav>
 </div>
@@ -7466,43 +7486,6 @@ Züttlingen;4929166;932912
 Ürzig DB;4999593;700481</script>
 <script>
 'use strict';
-/* ---------- Demo-Daten (erfunden) ---------- */
-var DEMO = {
-  zug: '99990',
-  stamm: [['Strecke', 'Nordhafen Gbf – Südwerk Ksf'], ['Zuggattung', 'DGS'], ['Triebfahrzeug', '193'], ['Last', '1 610 t'], ['Länge', '585 m'], ['Mindestbremshundertstel', '72 P'], ['Höchstgeschwindigkeit', '100 km/h']],
-  punkte: [
-    {km: 2.4,  name: 'Nordhafen Gbf', ab: 0, v: 40},
-    {km: 3.1,  name: 'Asig N 12'},
-    {km: 3.6,  name: '¥', v: 80},
-    {km: 6.0,  v: 100},
-    {km: 7.9,  name: 'Bk Lindenau', ab: 5},
-    {km: 11.3, name: 'Abzw Kiesgrube', ab: 7},
-    {km: 13.2, name: 'Hirschberg-Tunnel', tu: 'a'},
-    {km: 14.5, name: '', tu: 'e'},
-    {km: 16.8, name: 'Hp Mühlbach', ab: 11},
-    {km: 18.2, v: 90},
-    {km: 20.6, name: 'Esig A'},
-    {km: 21.5, name: 'Altenrode', an: 14, ab: 19, halt: '+'},
-    {km: 22.0, name: 'Asig P 3'},
-    {km: 22.4, v: 100},
-    {km: 27.6, name: 'Üst Hagenfeld', ab: 25},
-    {km: 30.2, name: 'Sbk 2031'},
-    {km: 33.0, v: 60, inv: true},
-    {km: 33.9, name: 'Weidenbruch', ab: 29},
-    {km: 34.8, v: 80},
-    {km: 38.7, name: 'Bk Sandkrug', ab: 34},
-    {km: 41.6, v: 60},
-    {km: 42.1, name: 'Abzw Südkreuz', ab: 37},
-    {km: 44.9, name: 'Esig F'},
-    {km: 45.2, v: 40},
-    {km: 46.3, name: 'Südwerk Ksf', an: 42}
-  ],
-  la: [
-    {nr: 1, von: 24.3, bis: 25.1, v: 50, gleis: 'beide Gleise', zeit: 'ganztägig', grund: 'Oberbaumängel'},
-    {nr: 2, von: 36.0, bis: 36.4, v: 30, gleis: 'Regelgleis', zeit: 'täglich 07:00–17:00', grund: 'Bauarbeiten'}
-  ]
-};
-
 /* ---------- Zustand ---------- */
 var WT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 var EPS = 1e-6;
@@ -7513,11 +7496,15 @@ var plan = null, akt = 0, Z = [], ys = [], anker = [], letzteV = [], laBer = [],
 /* Tages-La: geladene Ausgaben, Zuordnung zum angezeigten Abschnitt */
 var laDocs = [], laZu = null, laLauf = 0, eintragZurueck = null, laSig = '', laGeprueft = 0;
 var LA_SPEICHER = 'fahrplananzeige.la', BEREICHE = ['Nord', 'Ost', 'Mitte', 'Südost', 'Süd'];
-var uhr = { probe: false, basis: 0, perf: 0, faktor: 1 };
+var uhrVersatz = 0;   // nur für Tests
 var modus = 'zeit', verspMs = 0, pause = false, pauseTe = 0, handPos = 0, zeitMoeglich = true;
 var blaetternBis = 0, markerEl = null, fenster = null, merk = null;
-/* La-Filter: Klassen von Einträgen, die nicht in der Anzeige stehen sollen */
-var laFilter = { absturz: false, gegen: false }, laAus = { a: 0, g: 0, n: 0 }, LAF_SPEICHER = 'fahrplananzeige.lafilter';
+/* GW: Fahrt auf dem Gegengleis. Nur dann erscheinen die Angaben in spitzen Klammern und die La-Einträge fürs Gegengleis. */
+var gw = false, GW_SPEICHER = 'fahrplananzeige.gw', ggCache = new WeakMap();
+/* Zeile des Fahrplans -> Index in der Anzeige; Lage der Geschwindigkeitslinie je Anzeigezeile (0 links … 1 rechts) */
+var zVon = new Map(), vFrac = [];
+/* La-Filter: Zeichen und Geltungen, deren Einträge nicht in der Anzeige stehen sollen */
+var laFilter = { zeichen: {}, geltung: {}, ruht: false }, laAus = { n: 0, gw: 0, zeichen: 0, geltung: 0, ruht: 0 }, laKlassen = { zeichen: [], geltung: [] }, LAF_SPEICHER = 'fahrplananzeige.lafilter2';
 /* Ortung: Verzeichnis, Wegachse des Abschnitts, Weg je Anzeigezeile, laufende Ortung */
 var ortDaten = null, ortAchse = null, ortS = [], ortung = null, ortWache = null, ortHalt = 0, ortUngenau = 0, ortZeig = null;
 var wachSperre = null, wachSoll = false;
@@ -7525,7 +7512,7 @@ var SPEICHER = 'fahrplananzeige.plan';
 var pdfDoc = null, origNr = null, origLauf = 0;
 
 /* ---------- Uhr ---------- */
-function jetzt() { return uhr.probe ? uhr.basis + (performance.now() - uhr.perf) * uhr.faktor : Date.now(); }
+function jetzt() { return Date.now() + uhrVersatz; }
 
 /* ---------- Formate ---------- */
 function z2(n) { return (n < 10 ? '0' : '') + n; }
@@ -7555,37 +7542,19 @@ function sym(s) {
   return o;
 }
 
-/* ---------- Plan aufbauen ---------- */
-function leer() { return { lines: [], kms: [], plus: [], label: null, an: null, ab: null, anMarke: '', v: null, vg: null, vKm: null, vKmNeu: null, strich: false, start: false, hinweis: [], fn: [], tu: null, saege: 0, info: false, seite: 0, tAn: null, tAb: null, imTunnel: false }; }
-function demoPlan() {
-  var z = DEMO.punkte.map(function (p) {
-    var E = leer();
-    if (p.name) E.lines = [p.name];
-    E.kms = [fmtKm(p.km)]; E.km = p.km;
-    if (p.v != null) E.v = { v: p.v, inv: !!p.inv };
-    if (p.an != null) { E.tAn = p.an; E.an = { s: '', halt: p.halt || '' }; }
-    if (p.ab != null) { E.tAb = p.ab; E.ab = { s: '' }; }
-    E.tu = p.tu || null;
-    return E;
-  });
-  DEMO.la.forEach(function (la) {
-    var a = leer(); a.km = la.von; a.kms = [fmtKm(la.von)]; a.la = la; a.laTyp = 'a';
-    var e = leer(); e.km = la.bis; e.kms = [fmtKm(la.bis)]; e.la = la; e.laTyp = 'e';
-    z.push(a); z.push(e);
-  });
-  z.sort(function (a, b) { return a.km - b.km; });
-  var tunnel = false, offen = 0;
-  z.forEach(function (E) {
-    if (E.tu === 'a') tunnel = true;
-    E.imTunnel = tunnel;
-    if (E.tu === 'e') tunnel = false;
-    if (E.laTyp === 'a') offen++;
-    E.imLa = offen > 0;
-    if (E.laTyp === 'e') offen--;
-  });
-  var basis = Math.round((Date.now() - 6.5 * 60000) / 60000) * 60000;
-  return { demo: true, datei: '', kopf: { zug: DEMO.zug, zeilen: [] }, stamm: DEMO.stamm, basisMs: basis, bloecke: [{ typ: 'regel', name: 'Regelweg', zeilen: z }], warnungen: [], blattseiten: 0 };
+/* wie sym(), Angaben in spitzen Klammern (Gegengleis) hervorgehoben; st.drin: Klammer aus der Zeile davor noch offen */
+function symGg(l, st) {
+  var o = st.drin ? '<span class="gg">' : '';
+  for (var i = 0; i < l.length; i++) {
+    var c = l.charAt(i);
+    if (c === '<') { if (!st.drin) { o += '<span class="gg">'; st.drin = true; } o += '‹'; }
+    else if (c === '>') { o += '›'; if (st.drin) { o += '</span>'; st.drin = false; } }
+    else o += sym(c);
+  }
+  return o + (st.drin ? '</span>' : '');
 }
+
+/* ---------- Plan aufbauen ---------- */
 function planAusPdf(r, datei) {
   var k = r.kopf, basis = k.datum ? new Date(k.datum.j, k.datum.m - 1, k.datum.t).getTime() : null;
   var stamm = [];
@@ -7600,7 +7569,7 @@ function planAusPdf(r, datei) {
   if (k.mbr) stamm.push(['Mindestbremshundertstel', k.mbr]);
   if (k.vmax) stamm.push(['Höchstgeschwindigkeit', k.vmax]);
   if (k.gedruckt) stamm.push(['Gedruckt', k.gedruckt]);
-  return { ver: 1, demo: false, datei: datei || '', kopf: k, stamm: stamm, basisMs: basis, ohneDatum: basis === null, bloecke: [r.regel].concat(r.alternativen), warnungen: r.warnungen, blattseiten: r.blattseiten, pdfSeiten: r.pdfSeiten, seiten: r.seiten };
+  return { ver: 1, datei: datei || '', kopf: k, stamm: stamm, basisMs: basis, ohneDatum: basis === null, bloecke: [r.regel].concat(r.alternativen), warnungen: r.warnungen, blattseiten: r.blattseiten, pdfSeiten: r.pdfSeiten, seiten: r.seiten };
 }
 
 /* ---------- Zeit und Ort ---------- */
@@ -7639,7 +7608,18 @@ function yAt(pos) {
 }
 function sollzeit() { return pause ? pauseTe : jetzt() - verspMs; }
 function markerPos() { return modus === 'hand' ? handPos : modus === 'ort' ? ortPos() : posAt(sollzeit()); }
-function verspaetung() { return pause ? jetzt() - pauseTe : verspMs; }
+/* Sollzeit einer Zeile: gedruckte Zeiten, am Halt die Spanne von Ankunft bis Abfahrt; sonst zwischen den Fahrzeiten verteilt */
+function zeitAn(i) {
+  var E = Z[Math.max(0, Math.min(Z.length - 1, Math.round(i)))];
+  if (E && (E.tAn != null || E.tAb != null)) return { lo: tMs(E.tAn != null ? E.tAn : E.tAb), hi: tMs(E.tAb != null ? E.tAb : E.tAn) };
+  var t = planAt(i);
+  return { lo: t, hi: t };
+}
+/* Im Handbetrieb zählt die Uhr gegen die Sollzeit der Markerzeile */
+function verspaetung() {
+  if (modus === 'hand') { var b = zeitAn(handPos), j = jetzt(); return j < b.lo ? j - b.lo : j > b.hi ? j - b.hi : 0; }
+  return pause ? jetzt() - pauseTe : verspMs;
+}
 function setzeMarker(i) {
   if (modus === 'ort') {
     /* Standort von Hand: die Ortung misst von dort weiter */
@@ -7654,7 +7634,9 @@ function setzeMarker(i) {
 }
 function schritt(richtung) {
   if (!Z.length) return;
-  var p = markerPos(), ziel = richtung > 0 ? Math.floor(p + EPS) + 1 : Math.ceil(p - EPS) - 1;
+  /* Der Marker läuft zwischen zwei Tastendrücken weiter. Steht er knapp über einer Zeile, zählt er als auf ihr:
+     ▼ führt dann zur Zeile darunter und nicht nur das kleine Stück zurück; für ▲ gilt dasselbe nach oben. */
+  var p = markerPos(), ziel = richtung > 0 ? Math.floor(p + 0.3) + 1 : Math.ceil(p - 0.3) - 1;
   ziel = Math.max(0, Math.min(Z.length - 1, ziel));
   setzeMarker(ziel);
   tick();
@@ -7683,42 +7665,88 @@ function laStand(t) {
   if (e.inKraft.ms != null && e.inKraft.ms > echt) return e.inKraft.ms > fahrtEnde() ? 'spaeter' : 'bald';
   return 'jetzt';
 }
+/* Angaben in spitzen Klammern gelten für Fahrten auf dem Gegengleis. og(E): die Zeile ohne diese Angaben. */
+function og(E) {
+  var c = ggCache.get(E);
+  if (c) return c;
+  var roh = E.lines.join('\n'), ohne = roh.indexOf('<') < 0 ? roh : roh.replace(/<[^<>]*>/g, '');
+  var lines = ohne === roh ? E.lines : ohne.split('\n').map(function (l) { return l.replace(/\s+,/g, ',').replace(/,(\s*,)+/g, ',').replace(/^[\s,]+|[\s,]+$/g, ''); }).filter(Boolean);
+  var hinweis = E.hinweis.filter(function (h) { return !/^<.*>$/.test(h); });
+  var hatte = lines !== E.lines || hinweis.length !== E.hinweis.length || !!E.vg;
+  c = { lines: lines, hinweis: hinweis, leer: hatte && !lines.length && !hinweis.length && !E.v && !E.anMarke && !E.tu && !E.saege && !E.fn.length && !E.nurKm };
+  ggCache.set(E, c);
+  return c;
+}
+/* La: Bestandteile der Spalte „Geltung“ einer Angabe */
+var RE_LA_GG = /^gilt nur für (gegengleis|dchg hgl der gegenri)/i;
+var RE_LA_GLEIS = /^gilt nur für (regelgleis|gegengleis|dchg hgl der gegenri|dchg hgl und nicht dchg hgl|dchg hgl|nicht dchg hgl)$/i;
+function laGeltung(T) { return (T.geltung || '').split(' · ').map(function (x) { return x.trim(); }).filter(Boolean); }
+/* Grund, aus dem eine Angabe nicht gezeigt wird: 'gw' (gilt nur fürs Gegengleis), 'geltung', 'zeichen' oder '' */
+function laTeilAus(T) {
+  var g = laGeltung(T), k;
+  for (k = 0; k < g.length; k++) if (!gw && RE_LA_GG.test(g[k])) return 'gw';
+  for (k = 0; k < g.length; k++) if (laFilter.geltung[g[k]]) return 'geltung';
+  if (!T.v && T.sym.length && !T.ortSym.length && T.sym.every(function (x) { return x && laFilter.zeichen[x]; })) return 'zeichen';
+  return '';
+}
+function laEintragAus(o) {
+  var T = o.e.teile, gr = T.map(laTeilAus);
+  if (T.length && gr.every(Boolean)) return gr.indexOf('gw') >= 0 ? 'gw' : gr[0];
+  if (laFilter.ruht && (o.st === 'vorbei' || o.st === 'spaeter')) return 'ruht';
+  return '';
+}
 /* Fahrplanzeilen des Abschnitts, dazwischen die eingeordneten La-Einträge */
 function baueZeilen() {
-  var basis = plan.bloecke[akt].zeilen, n = basis.length, k;
-  laZu = null; laBer = []; laIn = []; laAus = { a: 0, g: 0, n: 0 };
-  if (plan.demo) {
-    Z = basis;
-    var st = {};
-    Z.forEach(function (E, i) { if (E.laTyp === 'a') st[E.la.nr] = i; if (E.laTyp === 'e') laBer.push({ a: st[E.la.nr], e: i, v: E.la.v }); });
-    return;
-  }
-  if (!laDocs.length) { Z = basis; return; }
-  laZu = TagesLa.ordne(basis, laDocs, nameVon);
-  var bei = new Array(n + 1);
+  var basis = plan.bloecke[akt].zeilen, n = basis.length, k, bei = new Array(n + 1);
+  laZu = null; laBer = []; laIn = []; laAus = { n: 0, gw: 0, zeichen: 0, geltung: 0, ruht: 0 }; laKlassen = { zeichen: [], geltung: [] };
   function leg(p, z) { p = Math.max(0, Math.min(n, p)); (bei[p] = bei[p] || []).push(z); }
-  /* Ende-Zeile und Schraffur nur für geltende Einträge mit Geschwindigkeit */
-  function filtere(o) {
-    var k = laArt(o.e), a = laFilter.absturz && k.a;
-    o.aus = a || (laFilter.gegen && k.g);
-    if (o.aus) { laAus.n++; if (a) laAus.a++; else laAus.g++; }
+  if (laDocs.length) {
+    laZu = TagesLa.ordne(basis, laDocs, nameVon);
+    var kz = {}, kg = {};
+    var filtere = function (o) {
+      o.st = laStand(o);
+      var z = {}, g = {};
+      o.e.teile.forEach(function (T) {
+        if (!T.v && !T.ortSym.length) T.sym.forEach(function (x) { if (x) z[x] = true; });
+        laGeltung(T).forEach(function (x) { if (!RE_LA_GLEIS.test(x) && !RE_LA_GG.test(x)) g[x] = true; });
+      });
+      Object.keys(z).forEach(function (x) { kz[x] = (kz[x] || 0) + 1; });
+      Object.keys(g).forEach(function (x) { kg[x] = (kg[x] || 0) + 1; });
+      o.grundAus = laEintragAus(o);
+      o.aus = !!o.grundAus;
+      if (o.aus) { laAus.n++; laAus[o.grundAus]++; }
+    };
+    laZu.offen.forEach(filtere);
+    /* Ende-Zeile und Schraffur nur für geltende Einträge mit Geschwindigkeit */
+    laZu.eintraege.forEach(function (t, i) {
+      t.id = i; filtere(t);
+      var a = laZeile(t, 'a', basis);
+      t.ende = !t.aus && t.p1 !== null && a.lv != null && a.aktiv && t.lageOk;
+      t.zeileA = a;
+    });
+    var liste = function (m) { return Object.keys(m).map(function (x) { return { name: x, n: m[x] }; }).sort(function (a, b) { return b.n - a.n || (a.name < b.name ? -1 : 1); }); };
+    laKlassen = { zeichen: liste(kz), geltung: liste(kg) };
+    laSig = laZu.eintraege.map(function (t) { return t.st; }).join(',');
+    laZu.eintraege.forEach(function (t) { if (t.ende && t.p1 > t.p0) leg(t.p1, laZeile(t, 'e', basis)); });
+    laZu.eintraege.forEach(function (t) { if (!t.aus) { leg(t.p0, t.zeileA); if (t.ende && t.p1 <= t.p0) leg(t.p0, laZeile(t, 'e', basis)); } delete t.zeileA; });
   }
-  laZu.offen.forEach(filtere);
-  laZu.eintraege.forEach(function (t, i) {
-    t.id = i; t.st = laStand(t); filtere(t);
-    var a = laZeile(t, 'a', basis);
-    t.ende = !t.aus && t.p1 !== null && a.lv != null && a.aktiv && t.lageOk;
-    t.zeileA = a;
-  });
-  laSig = laZu.eintraege.map(function (t) { return t.st; }).join(',');
-  laZu.eintraege.forEach(function (t) { if (t.ende && t.p1 > t.p0) leg(t.p1, laZeile(t, 'e', basis)); });
-  laZu.eintraege.forEach(function (t) { if (!t.aus) { leg(t.p0, t.zeileA); if (t.ende && t.p1 <= t.p0) leg(t.p0, laZeile(t, 'e', basis)); } delete t.zeileA; });
-  Z = [];
-  for (k = 0; k <= n; k++) { if (bei[k]) Array.prototype.push.apply(Z, bei[k]); if (k < n) Z.push(basis[k]); }
+  /* ohne GW entfallen Zeilen, die nur Angaben fürs Gegengleis tragen */
+  Z = []; zVon = new Map();
+  var wartend = [];
+  for (k = 0; k <= n; k++) {
+    if (bei[k]) Array.prototype.push.apply(Z, bei[k]);
+    if (k === n) break;
+    if (gw || !og(basis[k]).leer) {
+      wartend.forEach(function (E) { zVon.set(E, Z.length); }); wartend = [];
+      zVon.set(basis[k], Z.length); Z.push(basis[k]);
+    } else wartend.push(basis[k]);
+  }
+  wartend.forEach(function (E) { zVon.set(E, Math.max(0, Z.length - 1)); });
   var auf = {};
   Z.forEach(function (E, i) { if (!E.lar) return; if (E.laTyp === 'a') auf[E.lar.id] = i; else laBer.push({ a: auf[E.lar.id], e: i, v: E.lv }); });
   laBer.forEach(function (b) { for (var i = b.a; i <= b.e; i++) laIn[i] = true; });
 }
+function indexVon(E) { return E && zVon.has(E) ? zVon.get(E) : 0; }
 function richteEin() {
   baueZeilen();
   anker = []; letzteV = [];
@@ -7728,6 +7756,26 @@ function richteEin() {
     if (E.tAb != null) anker.push({ t: tMs(E.tAb), i: i });
     if (E.v) lv = i;
     letzteV.push(lv);
+  });
+  /* Mehrere Zeilen in derselben Minute: über die Minute verteilen, damit jede Zeile ihren Zeitpunkt hat
+     und der Marker sie mit ▲ und ▼ erreicht */
+  for (var a = 0; a < anker.length;) {
+    var b = a;
+    while (b + 1 < anker.length && anker[b + 1].t === anker[a].t) b++;
+    if (b > a) {
+      var nach = b + 1 < anker.length ? anker[b + 1].t - anker[a].t : 60000, anz = b - a + 1;
+      if (nach > 0) for (var q = 1; q < anz; q++) anker[a + q].t += q * Math.min(60000, nach) / anz;
+    }
+    a = b + 1;
+  }
+  /* Geschwindigkeitslinie: Höchstgeschwindigkeit des Zuges aus den Fahrplanstammdaten, sonst die höchste im Abschnitt */
+  var vmax = parseInt(plan.kopf.vmax, 10) || 0, vmin = Infinity, vhoch = 0, v1 = null;
+  Z.forEach(function (E) { if (E.v) { if (v1 === null) v1 = E.v.v; vmin = Math.min(vmin, E.v.v); vhoch = Math.max(vhoch, E.v.v); } });
+  if (!vmax) vmax = vhoch;
+  var vlo = isFinite(vmin) ? Math.max(0, Math.min(vmin, vmax) - 10) : 0;
+  vFrac = Z.map(function (E, i) {
+    var iv = letzteV[i], v = iv >= 0 ? Z[iv].v.v : v1;
+    return v === null || vmax <= vlo ? 1 : Math.max(0, Math.min(1, (v - vlo) / (vmax - vlo)));
   });
   zeitMoeglich = anker.length >= 2;
   ortRichteEin();
@@ -7741,7 +7789,7 @@ function setzeBlock(idx, neu) {
   richteEin();
   pause = false; verspMs = 0;
   if (!zeitMoeglich) { modus = 'hand'; handPos = 0; } else modus = 'zeit';
-  if (!neu && idx === 0 && merk) { verspMs = merk.verspMs; pause = merk.pause; pauseTe = merk.pauseTe; modus = merk.modus; handPos = Math.max(0, Z.indexOf(merk.zeile)); merk = null; }
+  if (!neu && idx === 0 && merk) { verspMs = merk.verspMs; pause = merk.pause; pauseTe = merk.pauseTe; modus = merk.modus; handPos = indexVon(merk.zeile); merk = null; }
   /* laufende Ortung: im neuen Abschnitt neu aufsetzen, bei neuem Fahrplan beenden */
   if (ortAn) {
     if (!neu && ortMoeglich()) { ortHalt = modus === 'hand' ? handPos : posAt(sollzeit()); pause = false; ortNeu(); modus = 'ort'; }
@@ -7751,10 +7799,11 @@ function setzeBlock(idx, neu) {
 }
 /* La geladen oder entfernt: Zeilen neu aufbauen, Marker und Verspätung behalten */
 function laGeaendert() {
+  if (!plan) { chipsStand = ''; zeigeChips(jetzt()); $('sitzung-weg').hidden = !laDocs.length; return; }
   var ref = modus === 'hand' ? zeileAm(handPos) : modus === 'ort' ? zeileAm(ortHalt) : null;
   richteEin();
-  if (modus === 'hand') handPos = Math.max(0, Z.indexOf(ref));
-  else if (modus === 'ort') ortHalt = Math.max(0, Z.indexOf(ref));
+  if (modus === 'hand') handPos = indexVon(ref);
+  else if (modus === 'ort') ortHalt = indexVon(ref);
   else if (!zeitMoeglich) { modus = 'hand'; handPos = 0; }
   chipsStand = ''; laGeprueft = Date.now();
   zeichne(); messe(); zeigeModus(); tick();
@@ -7768,8 +7817,7 @@ function vorschau(pos) {
   for (var i = i0 + 1; i < Z.length; i++) {
     var E = Z[i];
     if (!erm) {
-      if (E.laTyp === 'a' && E.la) erm = { la: true, v: E.la.v, i: i };
-      else if (E.laTyp === 'a' && E.lv != null) { if (E.aktiv && (lauf == null || E.lv < lauf)) erm = { la: true, v: E.lv, i: i, frag: !E.lar.sicher }; }
+      if (E.laTyp === 'a' && E.lv != null) { if (E.aktiv && (lauf == null || E.lv < lauf)) erm = { la: true, v: E.lv, i: i, frag: !E.lar.sicher }; }
       else if (E.v) { if (lauf != null && E.v.v < lauf) erm = { la: false, v: E.v.v, i: i }; lauf = E.v.v; }
     }
     if (!halt && E.tAn != null) halt = i;
@@ -7847,46 +7895,43 @@ function laZeileHtml(E, i) {
 function zeileHtml(E, i) {
   var kl = ['z'], h;
   if (E.lar) return laZeileHtml(E, i);
-  if (E.la) {
-    kl.push('la', 'im-la');
-    if (E.laTyp === 'a') h = '<div class="c v num">' + E.la.v + '</div><div class="c km num">' + kmText(E) + '</div><div class="c g"></div><div class="c tx"><b>La ' + E.la.nr + '</b> · ' + E.la.v + ' km/h · km ' + fmtKm(E.la.von) + '–' + fmtKm(E.la.bis) + '<span class="la-zus">' + esc(E.la.gleis) + ' · ' + esc(E.la.zeit) + ' · ' + esc(E.la.grund) + '</span></div>';
-    else h = '<div class="c v num"></div><div class="c km num">' + kmText(E) + '</div><div class="c g"></div><div class="c tx">Ende La ' + E.la.nr + '</div>';
-    return { kl: kl.join(' '), h: h };
-  }
   if (E.info) kl.push('info');
   if (E.tAn != null || E.tAb != null) kl.push('bst');
-  if (E.v || E.vg) kl.push('wechsel');
+  if (E.v || (E.vg && gw)) kl.push('wechsel');
   if (E.strich) kl.push('strich');
   if (E.imTunnel) kl.push('tu');
   if (E.tu === 'a') kl.push('tu-a');
   if (E.tu === 'e') kl.push('tu-e');
-  if (E.imLa || laIn[i]) kl.push('im-la');
+  if (laIn[i]) kl.push('im-la');
   var v = '';
   if (E.v) v += '<span class="vz' + (E.v.inv ? ' inv' : '') + '">' + E.v.v + '</span>';
-  if (E.vg) v += '<span class="vg' + (E.vg.inv ? ' inv' : '') + '">‹' + E.vg.v + '›</span>';
+  if (E.vg && gw) v += '<span class="vg gg' + (E.vg.inv ? ' inv' : '') + '">‹' + E.vg.v + '›</span>';
   var g = '';
   if (E.saege) g = '<svg class="saege" viewBox="0 0 ' + (E.saege > 1 ? 14 : 8) + ' 20" preserveAspectRatio="none" aria-hidden="true"><path d="M1 0l5 5-5 5 5 5-5 5' + (E.saege > 1 ? 'M8 0l5 5-5 5 5 5-5 5' : '') + '" fill="none" stroke="currentColor" stroke-width="1.3" vector-effect="non-scaling-stroke"/></svg>';
-  var tx = '';
-  E.lines.forEach(function (l, j) {
-    var hw = j === 0 && E.hinweis.length ? '<span class="hw">' + sym(E.hinweis.join(' ')) + '</span>' : '';
-    tx += '<div class="zl' + (j === 0 ? ' t0' : '') + '"><span>' + sym(l) + '</span>' + hw + '</div>';
+  var tx = '', L = gw ? E.lines : og(E).lines, H = gw ? E.hinweis : og(E).hinweis, kl0 = { drin: false };
+  L.forEach(function (l, j) {
+    var hw = j === 0 && H.length ? '<span class="hw">' + symGg(H.join(' '), { drin: false }) + '</span>' : '';
+    tx += '<div class="zl' + (j === 0 ? ' t0' : '') + '"><span>' + symGg(l, kl0) + '</span>' + hw + '</div>';
   });
-  if (!E.lines.length && E.hinweis.length) tx += '<div class="zl"><span></span><span class="hw">' + sym(E.hinweis.join(' ')) + '</span></div>';
+  if (!L.length && H.length) tx += '<div class="zl"><span></span><span class="hw">' + symGg(H.join(' '), { drin: false }) + '</span></div>';
   E.fn.forEach(function (f) { tx += '<span class="fn">' + sym(f) + '</span>'; });
   var an = E.tAn != null ? ((E.an && E.an.halt) ? '<span class="halt">' + esc(E.an.halt) + '</span>' : '') + fmtPlanZeit(E.tAn) : (E.anMarke ? '<span class="halt">' + esc(E.anMarke) + '</span>' : '');
   var ab = E.tAb != null ? fmtPlanZeit(E.tAb) : '';
   h = '<div class="c v num">' + v + '</div><div class="c km num">' + kmText(E) + '</div><div class="c g">' + g + '</div><div class="c tx">' + tx + '</div><div class="c an num">' + an + '</div><div class="c ab num">' + ab + '</div>';
   return { kl: kl.join(' '), h: h };
 }
-function fmtPlanZeit(min) { return plan.demo ? fmtPlan((plan.basisMs - heuteNullVon(plan.basisMs)) / 60000 + min) : fmtPlan(min); }
-function heuteNullVon(ms) { var d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function fmtPlanZeit(min) { return fmtPlan(min); }
 
 function zeichne() {
   var B = plan.bloecke[akt];
   $('k-zug').textContent = plan.kopf.zug || '–';
   $('k-weg').textContent = B.typ === 'regel' ? 'Regelweg' : B.name;
   var teile = [];
-  for (var i = Z.length - 1; i >= 0; i--) { var r = zeileHtml(Z[i], i); teile.push('<div class="' + r.kl + '" data-i="' + i + '">' + r.h + '</div>'); }
+  for (var i = Z.length - 1; i >= 0; i--) {
+    var r = zeileHtml(Z[i], i), f = vFrac[i], f0 = i > 0 ? vFrac[i - 1] : f, st = '--vx:' + f.toFixed(3);
+    if (f0 !== f) { r.kl += ' vstufe'; st += ';--va:' + Math.min(f, f0).toFixed(3) + ';--vb:' + Math.max(f, f0).toFixed(3); }
+    teile.push('<div class="' + r.kl + '" data-i="' + i + '" style="' + st + '">' + r.h + '</div>');
+  }
   bahn.innerHTML = teile.join('') + '<div class="marker" id="marker"></div>';
   markerEl = $('marker');
 }
@@ -7902,22 +7947,24 @@ function sichtbar(i) { var o = sicht.scrollTop; return ys[i] >= o && ys[i] <= o 
 function nameVon(E) { return window.Blattfahrplan ? Blattfahrplan.eintragName(E) : (E.lines[0] || ''); }
 
 function tick() {
+  var t = jetzt();
+  $('k-zeit').textContent = fmtUhr(t);
+  $('k-datum').textContent = fmtDatum(t);
   if (!plan || !markerEl) return;
   /* Stand der La-Einträge (gültig, in Kraft) kann sich mit der Uhr ändern */
   if (laZu && Date.now() - laGeprueft > 15000) {
     laGeprueft = Date.now();
     if (laZu.eintraege.map(laStand).join(',') !== laSig) { laGeaendert(); return; }
   }
-  var t = jetzt();
-  $('k-zeit').textContent = fmtUhr(t);
-  $('k-datum').textContent = fmtDatum(t);
-
   var pos = markerPos(), y = yAt(pos);
   markerEl.style.transform = 'translateY(' + y.toFixed(1) + 'px)';
-  if (performance.now() >= blaetternBis) sicht.scrollTop = Math.max(0, y - sicht.clientHeight * 0.68);
+  /* nach dem Blättern von Hand bleibt die Ansicht stehen; zurück geht es mit einem Druck auf das Geschwindigkeitsfeld oder nach 30 s von selbst */
+  var zielTop = Math.max(0, y - sicht.clientHeight * 0.68), frei = performance.now() < blaetternBis;
+  if (!frei) sicht.scrollTop = zielTop;
+  $('wdh').classList.toggle('weg', frei && Math.abs(sicht.scrollTop - zielTop) > 40);
 
   var s = vorschau(pos), wv = $('wdh-v'), wl = $('wdh-la');
-  wv.innerHTML = s.v != null ? s.v + (s.vg != null ? '<span class="gg">‹' + s.vg + '›</span>' : '') : '';
+  wv.innerHTML = s.v != null ? s.v + (gw && s.vg != null ? '<span class="gg">‹' + s.vg + '›</span>' : '') : '';
   wv.hidden = s.v == null;
   wl.hidden = s.la === null;
   if (s.la !== null) wl.textContent = 'La ' + s.la;
@@ -7927,29 +7974,28 @@ function tick() {
     var Ee = Z[s.erm.i], kme = Ee.vKm ? Ee.vKm.s : (Ee.kms[0] || '');
     teile.push('<span class="erm' + (s.erm.la ? ' ist-la' : '') + '">▼ ' + (s.erm.la ? 'La ' : '') + s.erm.v + ' km/h' + (s.erm.frag ? ' ?' : '') + (kme ? ' · km ' + esc(kme) : '') + '</span>');
   }
-  if (s.halt !== null && !sichtbar(s.halt)) teile.push('<span>Halt ' + sym(nameVon(Z[s.halt])) + ' · ' + fmtPlanZeit(Z[s.halt].tAn) + '</span>');
+  if (s.halt !== null && !sichtbar(s.halt)) { var Eh = Z[s.halt]; teile.push('<span>Halt ' + sym(nameVon(Eh)) + ' · ' + (Eh.an && Eh.an.halt ? esc(Eh.an.halt) : '') + fmtPlanZeit(Eh.tAn) + '</span>'); }
   $('st-oben').innerHTML = teile.length ? teile.join('') : '<span class="leer">Nächste Ermäßigung und nächster Halt sind im Bild</span>';
 
   $('su-modus').textContent = modus === 'hand' ? 'Manuell' : modus === 'ort' ? ortStatus() : pause ? 'Marker angehalten' : 'Zeit-Automatik';
-  /* in der Ortung keine Verspätung, wenn der Fahrplan keine Zeiten hat oder nicht für heute gilt */
-  var vt = modus === 'hand' || (modus === 'ort' && (!zeitMoeglich || Math.abs(verspMs) > 12 * 3600000)) ? '–' : fmtVersp(verspaetung());
+  /* von Hand und in der Ortung keine Verspätung, wenn der Abschnitt keine Zeiten hat oder der Fahrplan nicht für heute gilt */
+  var vz = zeitMoeglich ? verspaetung() : 0, vt = !zeitMoeglich || (modus !== 'zeit' && Math.abs(vz) > 12 * 3600000) ? '–' : fmtVersp(vz);
   if (!$('blatt-zeit').hidden) zeigeOrtStand();
   $('su-versp').textContent = vt;
   $('v-wert').textContent = vt;
   var bs = Z.length ? Z[Math.max(0, Math.min(Z.length - 1, Math.floor(pos + EPS)))].seite : 0, bo = $('b-orig');
-  bo.hidden = plan.demo || !bs;
+  bo.hidden = !bs;
   if (bs && bo.dataset.nr !== String(bs)) { bo.dataset.nr = String(bs); bo.textContent = 'Blattseite ' + bs; }
   zeigeChips(t);
 }
 var chipsStand = '';
 function zeigeChips(t) {
   var ausser = false, txt = '';
-  if (!plan.demo) {
+  if (plan) {
     if (plan.ohneDatum) { ausser = true; txt = 'Datum der PDF nicht gelesen'; }
-    else if (fenster && !uhr.probe && (t < fenster.a - 12 * 3600000 || t > fenster.e + 12 * 3600000)) { ausser = true; txt = 'Fahrplan gilt für ' + plan.kopf.datumText + ', nicht für heute'; }
+    else if (fenster && (t < fenster.a - 12 * 3600000 || t > fenster.e + 12 * 3600000)) { ausser = true; txt = 'Fahrplan gilt für ' + plan.kopf.datumText + ', nicht für heute'; }
+    else if (plan.kopf.datumText) txt = 'Fahrplan für ' + plan.kopf.datumText;
   }
-  if (!plan.demo && !ausser && plan.kopf.datumText) txt = 'Fahrplan für ' + plan.kopf.datumText;
-  /* La gilt nach der echten Uhr, auch im Probelauf */
   var laTxt = 'La nicht geladen', laAlt = '';
   if (laDocs.length) {
     var echt = Date.now(), alte = laDocs.filter(function (d) { return !laGueltig(d, echt); });
@@ -7958,14 +8004,12 @@ function zeigeChips(t) {
     if (alte.length) laTxt = 'La ' + alte.map(function (d) { return d.bereich + ' vom ' + fmtTag(d.tagMs); }).join(', ') + ' gilt nicht für heute';
     else laTxt = 'La ' + (einTag ? fmtTag(laDocs[0].tagMs) + ' ' + laDocs.map(function (d) { return d.bereich; }).join(', ') : laDocs.map(function (d) { return d.bereich + ' ' + fmtTag(d.tagMs); }).join(', ')) + (laZu && laZahl().off ? ' · ' + laZahl().off + ' offen' : '') + (laAus.n ? ' · ' + laAus.n + ' ausgeblendet' : '');
   }
-  var stand = [plan.demo, ausser, txt, uhr.probe, uhr.faktor, laTxt, laAlt].join('|');
+  var stand = [ausser, txt, gw, laTxt, laAlt].join('|');
   if (stand === chipsStand) return;
   chipsStand = stand;
-  $('ch-demo').hidden = !plan.demo;
   $('ch-datum').hidden = !txt; $('ch-datum').textContent = txt; $('ch-datum').classList.toggle('achtung', ausser);
-  $('ch-probe').hidden = !uhr.probe; $('ch-probe').textContent = 'Probelauf × ' + uhr.faktor;
-  $('ch-la').hidden = plan.demo; $('ch-la').textContent = laTxt; $('ch-la').classList.toggle('achtung', !!laAlt);
-  $('hinweistext').textContent = plan.demo ? 'Erfundener Fahrplan. Inoffizielle Anzeige, maßgebend bleiben Fahrplan und La.' : 'Inoffizielle Anzeige. Maßgebend bleiben Fahrplan-PDF und La.';
+  $('ch-gw').hidden = !gw;
+  $('ch-la').textContent = laTxt; $('ch-la').classList.toggle('achtung', !!laAlt);
 }
 
 /* ---------- Blätter ---------- */
@@ -7988,14 +8032,13 @@ function zeigeBlatt(taste) {
 function blattOffen() { return ALLE_BLAETTER.some(function (b) { return !$(b).hidden; }); }
 function fuelleFsd() {
   $('stamm').innerHTML = [['Zug', plan.kopf.zug || '–']].concat(plan.stamm).map(function (p) { return '<dt>' + esc(p[0]) + '</dt><dd>' + esc(p[1]) + '</dd>'; }).join('');
-  var R = plan.bloecke[0].zeilen, li = [];
+  /* Anfang, alle Halte und Ende des Regelwegs mit Ankunft und Abfahrt */
+  var R = plan.bloecke[0].zeilen, li = [], erste = -1, letzte = -1;
+  R.forEach(function (E, i) { if (E.tAn != null || E.tAb != null) { if (erste < 0) erste = i; letzte = i; } });
   R.forEach(function (E, i) {
-    if (E.la) return;
-    if (i === 0 || E.tAn != null || i === R.length - 1) {
-      var t = E.tAn != null ? fmtPlanZeit(E.tAn) : E.tAb != null ? fmtPlanZeit(E.tAb) : '';
-      var n = E.info ? '' : nameVon(E); if (!n) { for (var j = i; j < R.length && !n; j++) if (!R[j].info) n = nameVon(R[j]); }
-      li.push('<li><span>' + sym(n) + '</span><span class="num">' + t + '</span></li>');
-    }
+    if (i !== erste && i !== letzte && E.tAn == null) return;
+    var an = E.tAn != null ? (E.an && E.an.halt ? '<span class="halt">' + esc(E.an.halt) + '</span>' : '') + fmtPlanZeit(E.tAn) : '';
+    li.push('<li><span>' + sym(nameVon(E)) + '</span><span class="zt num">' + an + '</span><span class="zt num">' + (E.tAb != null ? fmtPlanZeit(E.tAb) : '') + '</span></li>');
   });
   $('halteliste').innerHTML = li.join('');
 }
@@ -8020,7 +8063,7 @@ function fuelleLa() {
   $('la-docs').innerHTML = laDocs.map(function (d) {
     var zus = [];
     if (!laGueltig(d, echt)) zus.push('gilt nicht für heute');
-    if (!d.voll) zus.push('aus dem Gerätespeicher, nur die La-Strecken dieses Fahrplans');
+    if (!d.voll) zus.push('aus dem Speicher dieses Tabs, nur die La-Strecken dieses Fahrplans');
     if (d.nWarn) zus.push(d.nWarn + (d.nWarn === 1 ? ' Stelle' : ' Stellen') + ' nicht sicher gelesen');
     if (d.unbekannt) zus.push(d.unbekannt + ' Zeichen nicht erkannt');
     d.hinweise.forEach(function (z) { hin.push('<li class="block"><span>' + esc(z) + '</span></li>'); });
@@ -8029,14 +8072,20 @@ function fuelleLa() {
   $('la-hinweisgruppe').hidden = !hin.length;
   $('la-hinweise').innerHTML = hin.join('');
   var wg = $('la-weggruppe'), og = $('la-offengruppe'), ag = $('la-allegruppe'), fg = $('la-filtergruppe'), xg = $('la-ausgruppe');
-  fg.hidden = !laDocs.length;
-  $('lf-absturz').setAttribute('aria-pressed', String(laFilter.absturz));
-  $('lf-gegen').setAttribute('aria-pressed', String(laFilter.gegen));
-  $('lf-text').textContent = (laAus.n ? 'Ausgeblendet: ' + laAus.n + (laAus.n === 1 ? ' Eintrag' : ' Einträge') + ' (' + [laAus.a ? laAus.a + ' Absturzgefahr' : '', laAus.g ? laAus.g + ' nur Gegengleis' : ''].filter(Boolean).join(', ') + '), Liste unten. ' : '') +
-    '„Absturzgefahr“ trifft Einträge, die nur dieses Zeichen tragen. „Nur Gegengleis“ trifft Einträge, deren Angaben alle nur für das Gegengleis oder das durchgehende Hauptgleis der Gegenrichtung gelten, auch solche mit Geschwindigkeit. Bei Fahrt auf dem Gegengleis ausschalten.';
+  fg.hidden = !laDocs.length || !laZu;
+  var wahl = function (liste, art, an) {
+    return liste.map(function (k) { return '<button class="knopf lang" type="button" data-' + art + '="' + esc(k.name) + '" aria-pressed="' + (an[k.name] ? 'true' : 'false') + '">' + esc(k.name) + ' <span class="num">(' + k.n + ')</span></button>'; }).join('');
+  };
+  $('lf-zeichen').innerHTML = wahl(laKlassen.zeichen, 'lfz', laFilter.zeichen);
+  $('lf-geltung').innerHTML = wahl(laKlassen.geltung, 'lfg', laFilter.geltung);
+  $('lf-zeichen').hidden = $('lf-zeichentitel').hidden = !laKlassen.zeichen.length; $('lf-geltung').hidden = $('lf-geltungtitel').hidden = !laKlassen.geltung.length;
+  $('lf-ruht').setAttribute('aria-pressed', String(laFilter.ruht));
+  var teileAus = [laAus.zeichen ? laAus.zeichen + ' nach Zeichen' : '', laAus.geltung ? laAus.geltung + ' nach Geltung' : '', laAus.ruht ? laAus.ruht + ' nicht in Kraft' : '', laAus.gw ? laAus.gw + ' nur Gegengleis' : ''].filter(Boolean);
+  $('lf-text').textContent = (laAus.n ? 'Ausgeblendet: ' + laAus.n + (laAus.n === 1 ? ' Eintrag' : ' Einträge') + ' (' + teileAus.join(', ') + '), Liste unten. ' : '') +
+    'Ein Zeichen trifft Einträge, die nur gewählte Zeichen tragen. Eine Geltung trifft Einträge, deren Angaben alle so eingeschränkt sind. „Nicht in Kraft“ trifft Einträge, die während der Fahrt nicht gelten. Einträge nur für das Gegengleis oder das durchgehende Hauptgleis der Gegenrichtung erscheinen mit der Taste GW. Die Wahl bleibt auf diesem Gerät gespeichert.';
   if (!laDocs.length) { wg.hidden = true; og.hidden = true; ag.hidden = true; xg.hidden = true; return; }
   wg.hidden = false;
-  if (plan.demo || !laZu) {
+  if (!plan || !laZu) {
     $('la-wegtitel').textContent = 'Auf dem Laufweg';
     $('la-wegtext').textContent = 'Eingeordnet wird, sobald ein Fahrplan aus einer PDF geladen ist.';
     $('la-strecken').innerHTML = ''; og.hidden = true; ag.hidden = true; xg.hidden = true; return;
@@ -8059,8 +8108,9 @@ function fuelleLa() {
   $('la-alle').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? '' : knopf(t, k, 'eintrag', t.sicher ? '' : t.hinweis); }).join('');
   xg.hidden = !laAus.n;
   $('la-austitel').textContent = 'Ausgeblendet (' + laAus.n + ')';
-  $('la-aus').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? knopf(t, k, 'eintrag', '') : ''; }).join('') +
-    laZu.offen.map(function (o, k) { return o.aus ? knopf(o, k, 'offen', 'nicht eingeordnet') : ''; }).join('');
+  var GRUND = { gw: 'nur Gegengleis, erscheint mit GW', zeichen: 'nach Zeichen ausgeblendet', geltung: 'nach Geltung ausgeblendet', ruht: 'nicht in Kraft' };
+  $('la-aus').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? knopf(t, k, 'eintrag', GRUND[t.grundAus]) : ''; }).join('') +
+    laZu.offen.map(function (o, k) { return o.aus ? knopf(o, k, 'offen', GRUND[o.grundAus] + ' · nicht eingeordnet') : ''; }).join('');
 }
 /* sichtbare eingeordnete und offene Einträge */
 function laZahl() {
@@ -8068,20 +8118,19 @@ function laZahl() {
   if (laZu) { laZu.eintraege.forEach(function (t) { if (!t.aus) ein++; }); laZu.offen.forEach(function (o) { if (!o.aus) off++; }); }
   return { ein: ein, off: off };
 }
-/* a: Eintrag trägt nur das Zeichen Absturzgefahr. g: alle Angaben gelten nur für das Gegengleis
-   oder das durchgehende Hauptgleis der Gegenrichtung. */
-function laArt(e) {
-  var T = e.teile;
-  if (!T.length) return { a: false, g: false };
-  return {
-    a: T.every(function (x) { return !x.v && x.sym.length === 1 && x.sym[0] === 'Absturzgefahr' && !x.ortSym.length; }),
-    g: T.every(function (x) { return /^Gilt nur für (Gegengleis|dchg Hgl der Gegenri)/.test(x.geltung || ''); })
-  };
-}
-function setzeLaFilter(art) {
-  laFilter[art] = !laFilter[art];
+function setzeLaFilter(art, name) {
+  if (art === 'ruht') laFilter.ruht = !laFilter.ruht;
+  else if (laFilter[art][name]) delete laFilter[art][name]; else laFilter[art][name] = true;
   try { localStorage.setItem(LAF_SPEICHER, JSON.stringify(laFilter)); } catch (e) {}
   laGeaendert(); laMeldung(''); fuelleLa();
+}
+/* GW: Fahrt auf dem Gegengleis an oder aus */
+function setzeGw(an) {
+  gw = !!an;
+  $('t-gw').setAttribute('aria-pressed', String(gw));
+  try { if (gw) sessionStorage.setItem(GW_SPEICHER, '1'); else sessionStorage.removeItem(GW_SPEICHER); } catch (e) {}
+  if (plan) laGeaendert(); else { chipsStand = ''; zeigeChips(jetzt()); }
+  if (!$('blatt-la').hidden) fuelleLa();
 }
 /* Einzelner La-Eintrag mit allen Spalten und der Originalseite */
 function zeigeLaEintrag(t, zurueck) {
@@ -8146,17 +8195,18 @@ function maleOrig(nr) {
   }).catch(function () { if (lauf === origLauf) { $('o-wrap').hidden = true; text.textContent = 'Die Seite ließ sich nicht zeichnen.'; } });
 }
 function zeigeModus() {
+  if (!plan) return;
   ['zeit', 'hand', 'ort'].forEach(function (m) { $('m-' + m).setAttribute('aria-pressed', String(modus === m)); });
+  $('m-hand').disabled = false;
   $('m-zeit').disabled = !zeitMoeglich;
   $('m-ort').disabled = !ortMoeglich();
-  $('m-text').textContent = zeitMoeglich ? 'Zeit-Automatik führt den Marker nach den Fahrzeiten, zwischen zwei Zeiten gleichmäßig über die Zeilen.' : 'Dieser Abschnitt hat keine Fahrzeiten. Der Marker wird mit ▲ und ▼ geführt.';
+  $('m-text').textContent = zeitMoeglich ? 'Zeit-Automatik führt den Marker nach den Fahrzeiten, zwischen zwei Zeiten gleichmäßig über die Zeilen. Manuell bleibt er, wo du ihn mit ▲ und ▼ hinsetzt; die Verspätung zählt dann gegen die Sollzeit dieser Zeile.' : 'Dieser Abschnitt hat keine Fahrzeiten. Der Marker wird mit ▲ und ▼ geführt.';
   var I = ortAchse && ortAchse.info;
-  $('ort-text').textContent = plan.demo ? 'Ortung gibt es nur mit einem Fahrplan aus einer PDF. Die Demo-Strecke ist erfunden.'
-    : !ortMoeglich() ? 'Ortung: Für diesen Abschnitt wurden zu wenige Betriebsstellen mit Koordinaten gefunden.'
+  $('ort-text').textContent = !ortMoeglich() ? 'Ortung: Für diesen Abschnitt wurden zu wenige Betriebsstellen mit Koordinaten gefunden.'
     : 'Ortung führt den Marker nach dem GPS-Standort des Geräts: Wegmessung von Punkt zu Punkt, Abgleich an ' + I.anker + ' Betriebsstellen mit bekannten Koordinaten (größte Lücke ' + fmtKm(I.luecke / 1000) + ' km, ' + I.wo + '). Die Verspätung ergibt sich aus Standort und Uhr. Ohne Empfang läuft der Marker nach der Zeit weiter. ▲ und ▼ setzen den Standort von Hand.';
   $('t-pause').disabled = modus !== 'zeit';
   $('t-pause').setAttribute('aria-pressed', String(pause));
-  $('t-pause').textContent = pause ? 'Weiter' : 'Pause';
+  $('t-pause').textContent = pause ? 'Marker läuft weiter' : 'Marker anhalten';
   ['v-minus', 'v-plus', 'v-null'].forEach(function (id) { $(id).disabled = modus !== 'zeit'; });
   zeigeOrtStand();
 }
@@ -8187,18 +8237,6 @@ function aendereVersp(ms) {
   if (pause) pauseTe -= ms; else verspMs += ms;
   tick();
 }
-function setzeUhr(probe, faktor) {
-  if (probe && modus === 'ort') setzeModus(zeitMoeglich ? 'zeit' : 'hand');
-  if (probe) {
-    var start = anker.length ? anker[0].t - 60000 : Date.now();
-    if (uhr.probe) start = jetzt();
-    uhr = { probe: true, basis: start, perf: performance.now(), faktor: faktor };
-  } else uhr = { probe: false, basis: 0, perf: 0, faktor: 1 };
-  verspMs = 0; pause = false; zeigeModus();
-  $('u-echt').setAttribute('aria-pressed', String(!probe));
-  Array.prototype.forEach.call(document.querySelectorAll('[data-probe]'), function (b) { b.setAttribute('aria-pressed', String(probe && Number(b.dataset.probe) === faktor)); });
-  tick();
-}
 function istDunkel() {
   var a = wurzel.dataset.anzeige;
   if (a) return a === 'nacht';
@@ -8206,7 +8244,24 @@ function istDunkel() {
   if (th) return th === 'dark';
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
-function zeigeAnzeige() { var dunkel = istDunkel(); $('a-tag').setAttribute('aria-pressed', String(!dunkel)); $('a-nacht').setAttribute('aria-pressed', String(dunkel)); }
+function zeigeAnzeige() { var dunkel = istDunkel(); $('a-tag').setAttribute('aria-pressed', String(!dunkel)); $('a-nacht').setAttribute('aria-pressed', String(dunkel)); zeigeVoll(''); }
+/* Vollbild: wo der Browser es anbietet; am iPhone geht es nur als Web-App vom Home-Bildschirm */
+function vollAn() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function alsApp() { return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
+function zeigeVoll(text) {
+  var d = document.documentElement, kann = !!(d.requestFullscreen || d.webkitRequestFullscreen), el = $('a-volltext');
+  $('a-voll').setAttribute('aria-pressed', String(vollAn()));
+  $('a-voll').hidden = alsApp();
+  if (!text && !alsApp() && !kann) text = 'Dieser Browser schaltet Seiten nicht ins Vollbild, so auch Safari am iPhone. Ohne Browserleisten läuft die Seite, wenn du sie in Safari über „Teilen“ zum Home-Bildschirm hinzufügst und von dort öffnest.';
+  el.hidden = !text; el.textContent = text || '';
+}
+function schalteVoll() {
+  var d = document.documentElement, an = d.requestFullscreen || d.webkitRequestFullscreen, aus = document.exitFullscreen || document.webkitExitFullscreen;
+  if (vollAn()) { if (aus) aus.call(document); return; }
+  if (!an) { zeigeVoll(''); return; }
+  try { var p = an.call(d); if (p && p.catch) p.catch(function () { zeigeVoll('Der Browser hat das Vollbild abgelehnt.'); }); }
+  catch (e) { zeigeVoll('Der Browser hat das Vollbild abgelehnt.'); }
+}
 function setzeAnzeige(neu) {
   wurzel.dataset.anzeige = neu;
   try { localStorage.setItem('fahrplananzeige.anzeige', neu); } catch (e) {}
@@ -8219,15 +8274,38 @@ function nimmPlan(p) {
   var zt = [];
   p.bloecke[0].zeilen.forEach(function (E) { if (E.tAn != null) zt.push(E.tAn); if (E.tAb != null) zt.push(E.tAb); });
   if (zt.length && p.basisMs !== null) fenster = { a: p.basisMs + zt[0] * 60000, e: p.basisMs + zt[zt.length - 1] * 60000 };
-  uhr = { probe: false, basis: 0, perf: 0, faktor: 1 };
-  $('u-echt').setAttribute('aria-pressed', 'true');
-  Array.prototype.forEach.call(document.querySelectorAll('[data-probe]'), function (b) { b.setAttribute('aria-pressed', 'false'); });
+  zeigeLeer();
   setzeBlock(0, true);
+}
+/* Fahrplan nur für die Sitzung: der Speicher des Tabs endet mit dem Tab */
+function speichere() { try { sessionStorage.setItem(SPEICHER, JSON.stringify(plan)); } catch (e) { try { sessionStorage.removeItem(SPEICHER); } catch (e2) {} } }
+/* Tasten und Fläche je nachdem, ob ein Fahrplan geladen ist */
+function zeigeLeer() {
+  var ohne = !plan;
+  $('leerstand').hidden = !ohne;
+  $('sitzung-weg').hidden = ohne && !laDocs.length;
+  ['t-fsd', 't-lw', 't-gw', 't-ab', 't-auf'].forEach(function (id) { $(id).disabled = ohne; });
+  if (ohne) {
+    ['m-zeit', 'm-hand', 'm-ort', 't-pause', 'v-minus', 'v-plus', 'v-null'].forEach(function (id) { $(id).disabled = true; });
+    $('m-text').textContent = 'Kein Fahrplan geladen.'; $('ort-text').textContent = ''; $('v-wert').textContent = '';
+    $('k-zug').textContent = '–'; $('k-weg').textContent = '–';
+    bahn.innerHTML = ''; markerEl = null; Z = []; ys = []; anker = [];
+    $('st-oben').innerHTML = ''; $('su-modus').textContent = ''; $('su-versp').textContent = ''; $('b-orig').hidden = true;
+    $('wdh-v').hidden = true; $('wdh-la').hidden = true; $('wdh').classList.remove('weg');
+  }
+}
+function loescheSitzung() {
+  if (modus === 'ort') ortStopp();
+  laDocs.forEach(function (d) { if (d.pdf) d.pdf.destroy(); });
+  if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) {} }
+  laDocs = []; laZu = null; plan = null; pdfDoc = null; gw = false; $('t-gw').setAttribute('aria-pressed', 'false'); modus = 'zeit'; pause = false; verspMs = 0; merk = null; fenster = null; ortAchse = null; ortS = [];
+  try { sessionStorage.removeItem(SPEICHER); sessionStorage.removeItem(LA_SPEICHER); sessionStorage.removeItem(GW_SPEICHER); } catch (e) {}
+  chipsStand = ''; zeigeLeer(); zeigeChips(jetzt()); meldung('Fahrplan und La sind gelöscht.'); laMeldung(''); zeigeBericht();
 }
 function meldung(text) { var m = $('lade-meldung'); m.hidden = !text; m.textContent = text || ''; }
 function zeigeBericht() {
   var b = $('bericht'), pr = $('pruefen');
-  if (!plan || plan.demo) { b.hidden = true; pr.hidden = true; return; }
+  if (!plan) { b.hidden = true; pr.hidden = true; return; }
   var k = plan.kopf, R = plan.bloecke[0].zeilen, zeiten = 0, vw = 0;
   R.forEach(function (E) { if (E.tAn != null) zeiten++; if (E.tAb != null) zeiten++; if (E.v) vw++; });
   var d = [['Datei', plan.datei || '–'], ['Zug', (k.zug || '–') + (k.gattung ? ' ' + k.gattung : '')], ['Strecke', k.strecke || '–'], ['Blattfahrplan für', k.datumText || 'nicht gelesen'],
@@ -8267,7 +8345,7 @@ function ladeDatei(datei) {
     laDocs = laDocs.filter(function (d) { return d.voll; });
     nimmPlan(p);
     pdfDoc = seiten.doc || null;
-    try { localStorage.setItem(SPEICHER, JSON.stringify(p)); } catch (e) {}
+    speichere();
     speichereLa();
     var w = (p.warnungen || []).length;
     meldung('Fahrplan geladen. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' konnte ich nicht sicher zuordnen, siehe Liste unten. ' : '') + laKurz());
@@ -8284,22 +8362,22 @@ function laKurz() {
   var lz = laZahl(), n = lz.ein, o = lz.off;
   return 'La: ' + n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (o ? ', ' + o + ' nicht eingeordnet (Taste La)' : '') + (laAus.n ? ', ' + laAus.n + ' ausgeblendet' : '') + '.';
 }
-function planKennung() { return plan && !plan.demo ? [plan.datei, plan.kopf.zug, plan.kopf.datumText, plan.bloecke[0].zeilen.length].join('|') : ''; }
+function planKennung() { return plan ? [plan.datei, plan.kopf.zug, plan.kopf.datumText, plan.bloecke[0].zeilen.length].join('|') : ''; }
 /* Gespeichert werden nur die La-Strecken, die den geladenen Fahrplan berühren */
 function speichereLa() {
   try {
-    if (!laDocs.length || !plan || plan.demo) { localStorage.removeItem(LA_SPEICHER); return; }
+    if (!laDocs.length || !plan) { sessionStorage.removeItem(LA_SPEICHER); return; }
     var nrn = TagesLa.beruehrt(plan.bloecke.map(function (B) { return B.zeilen; }), laDocs, nameVon);
     var docs = laDocs.map(function (d, di) {
       return { bereich: d.bereich, tagText: d.tagText, tagMs: d.tagMs, vonMs: d.vonMs, bisMs: d.bisMs, hinweise: d.hinweise, datei: d.datei, eintraege: d.eintraege, seiten: d.seiten,
         nWarn: d.nWarn, unbekannt: d.unbekannt, bloecke: d.bloecke.filter(function (B) { return nrn[di][B.nr]; }) };
     });
-    localStorage.setItem(LA_SPEICHER, JSON.stringify({ ver: 1, plan: planKennung(), docs: docs }));
-  } catch (e) { try { localStorage.removeItem(LA_SPEICHER); } catch (e2) {} }
+    sessionStorage.setItem(LA_SPEICHER, JSON.stringify({ ver: 1, plan: planKennung(), docs: docs }));
+  } catch (e) { try { sessionStorage.removeItem(LA_SPEICHER); } catch (e2) {} }
 }
 function holeLa() {
   try {
-    var l = JSON.parse(localStorage.getItem(LA_SPEICHER) || 'null');
+    var l = JSON.parse(sessionStorage.getItem(LA_SPEICHER) || 'null');
     if (!l || l.ver !== 1 || !l.docs || !l.docs.length || l.plan !== planKennung()) return;
     laDocs = l.docs.map(function (d) { d.voll = false; d.pdf = null; return d; });
     laGeaendert();
@@ -8335,7 +8413,7 @@ function ladeLa(dateien) {
     });
     laDocs.sort(function (a, b) { return BEREICHE.indexOf(a.bereich) - BEREICHE.indexOf(b.bereich); });
     if (neu.length) { laGeaendert(); speichereLa(); }
-    var text = neu.length ? neu.map(function (r) { return 'La-Bereich ' + r.bereich + ' gelesen'; }).join(', ') + '. ' + (plan.demo ? 'Eingeordnet wird, sobald ein Fahrplan geladen ist.' : laKurz()) : '';
+    var text = neu.length ? neu.map(function (r) { return 'La-Bereich ' + r.bereich + ' gelesen'; }).join(', ') + '. ' + (!plan ? 'Eingeordnet wird, sobald ein Fahrplan geladen ist.' : laKurz()) : '';
     laMeldung((text + ' ' + fehler.join(' ')).trim());
     fuelleLa();
   }).catch(function (e) { laMeldung(e && e.message ? e.message : 'Die Datei ließ sich nicht lesen.'); });
@@ -8353,7 +8431,7 @@ function ortRichteEin() {
   if (!ortAchse || ortAchse.zeilen !== basis) {
     ortAchse = { zeilen: basis, S: null, anker: [], spruenge: [], sprung: {}, km1: [], kmL: [], info: null };
     ortung = null;
-    var V = plan.demo ? false : ortVerzeichnis();
+    var V = ortVerzeichnis();
     if (V && n > 1) {
       var A = Ort.achse(basis), R = Ort.sucheAnker(basis, A, V, nameVon), lu = 0, wo = '';
       R.anker.forEach(function (a, k) { if (k && a.s - R.anker[k - 1].s > lu) { lu = a.s - R.anker[k - 1].s; wo = R.anker[k - 1].name + ' – ' + a.name; } });
@@ -8409,11 +8487,7 @@ function ortZeitBei(s, steht) {
   if (steht) {
     var best = -1, bd = 500;
     for (k = 0; k < n; k++) { var d = Math.abs(ortS[anker[k].i] - s); if (d <= bd && (Z[anker[k].i].tAn != null || k === 0)) { bd = d; best = anker[k].i; } }
-    if (best >= 0) {
-      var lo = Infinity, hi = -Infinity;
-      for (k = 0; k < n; k++) if (anker[k].i === best) { lo = Math.min(lo, anker[k].t); hi = Math.max(hi, anker[k].t); }
-      return { lo: lo, hi: hi };
-    }
+    if (best >= 0) return zeitAn(best);
   }
   for (k = n - 2; k >= 0; k--) {
     var a = anker[k], b = anker[k + 1], sa = ortS[a.i], sb = ortS[b.i];
@@ -8479,7 +8553,6 @@ function ortNeu() {
 }
 function ortStart() {
   if (!ortMoeglich()) return false;
-  if (uhr.probe) { ortMeldung('Im Probelauf gibt es keine Ortung. Stelle die Uhr auf Echtzeit.'); return false; }
   if (!('geolocation' in navigator)) { ortMeldung('Dieser Browser bietet keinen Standortzugriff.'); return false; }
   if (window.isSecureContext === false) { ortMeldung('Der Standortzugriff braucht eine https-Adresse.'); return false; }
   ortMeldung('');
@@ -8544,16 +8617,20 @@ $('m-zeit').addEventListener('click', function () { setzeModus('zeit'); });
 $('m-hand').addEventListener('click', function () { setzeModus('hand'); });
 $('m-ort').addEventListener('click', function () { setzeModus(modus === 'ort' ? (zeitMoeglich ? 'zeit' : 'hand') : 'ort'); });
 $('a-wach').addEventListener('click', function () { if (wachSoll) wachAus(); else wachAn(); });
-$('lf-absturz').addEventListener('click', function () { setzeLaFilter('absturz'); });
-$('lf-gegen').addEventListener('click', function () { setzeLaFilter('gegen'); });
+$('la-filtergruppe').addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-lfz],[data-lfg],#lf-ruht'); if (!b) return;
+  if (b.id === 'lf-ruht') setzeLaFilter('ruht'); else if (b.dataset.lfz != null) setzeLaFilter('zeichen', b.dataset.lfz); else setzeLaFilter('geltung', b.dataset.lfg);
+});
+$('t-gw').addEventListener('click', function () { setzeGw(!gw); });
+$('a-voll').addEventListener('click', schalteVoll);
+['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { zeigeVoll(''); if (plan) { messe(); tick(); } }); });
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && wachSoll && !wachSperre) wachAn(); });
 $('v-minus').addEventListener('click', function () { aendereVersp(-60000); });
 $('v-plus').addEventListener('click', function () { aendereVersp(60000); });
 $('v-null').addEventListener('click', function () { if (modus !== 'zeit') return; if (pause) pauseTe = jetzt(); else verspMs = 0; tick(); });
-$('u-echt').addEventListener('click', function () { setzeUhr(false, 1); });
-Array.prototype.forEach.call(document.querySelectorAll('[data-probe]'), function (b) { b.addEventListener('click', function () { setzeUhr(true, Number(b.dataset.probe)); }); });
 $('datei').addEventListener('change', function () { var f = this.files && this.files[0]; if (f) ladeDatei(f); this.value = ''; });
-$('demo-laden').addEventListener('click', function () { try { localStorage.removeItem(SPEICHER); localStorage.removeItem(LA_SPEICHER); } catch (e) {} laDocs = laDocs.filter(function (d) { return d.voll; }); nimmPlan(demoPlan()); meldung(''); zeigeBericht(); zeigeBlatt(null); });
+$('sitzung-weg').addEventListener('click', loescheSitzung);
+$('leer-laden').addEventListener('click', function () { zeigeBlatt('t-zug'); zeigeBericht(); });
 $('la-datei').addEventListener('change', function () { if (this.files && this.files.length) ladeLa(this.files); this.value = ''; });
 $('la-weg').addEventListener('click', entferneLa);
 $('blatt-la').addEventListener('click', function (ev) {
@@ -8573,7 +8650,8 @@ $('lw-liste').addEventListener('click', function (ev) {
 });
 $('a-tag').addEventListener('click', function () { setzeAnzeige('tag'); });
 $('a-nacht').addEventListener('click', function () { setzeAnzeige('nacht'); });
-['wheel', 'touchstart', 'pointerdown'].forEach(function (ev) { sicht.addEventListener(ev, function () { blaetternBis = performance.now() + 10000; }, { passive: true }); });
+['wheel', 'touchstart', 'pointerdown'].forEach(function (ev) { sicht.addEventListener(ev, function () { blaetternBis = performance.now() + 30000; }, { passive: true }); });
+$('wdh').addEventListener('click', function () { blaetternBis = 0; tick(); });
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') { zeigeBlatt(null); return; }
   if (blattOffen()) return;
@@ -8584,13 +8662,21 @@ window.addEventListener('resize', function () { if (plan) { messe(); tick(); } }
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', zeigeAnzeige);
 
 try { var a = localStorage.getItem('fahrplananzeige.anzeige'); if (a === 'tag' || a === 'nacht') wurzel.dataset.anzeige = a; } catch (e) {}
-try { var lf = JSON.parse(localStorage.getItem(LAF_SPEICHER) || 'null'); if (lf) laFilter = { absturz: lf.absturz === true, gegen: lf.gegen === true }; } catch (e) {}
+try {
+  var lf = JSON.parse(localStorage.getItem(LAF_SPEICHER) || 'null'), lfAlt = JSON.parse(localStorage.getItem('fahrplananzeige.lafilter') || 'null');
+  if (lf && typeof lf.zeichen === 'object' && typeof lf.geltung === 'object') laFilter = { zeichen: lf.zeichen || {}, geltung: lf.geltung || {}, ruht: lf.ruht === true };
+  else if (lfAlt && lfAlt.absturz === true) laFilter.zeichen.Absturzgefahr = true;
+} catch (e) {}
+try { gw = sessionStorage.getItem(GW_SPEICHER) === '1'; } catch (e) {}
+$('t-gw').setAttribute('aria-pressed', String(gw));
 zeigeAnzeige();
 (function () {
   var p = null;
-  try { var roh = localStorage.getItem(SPEICHER); if (roh) { p = JSON.parse(roh); if (!p || p.ver !== 1 || !p.bloecke || !p.bloecke[0] || !p.bloecke[0].zeilen.length) p = null; } } catch (e) { p = null; }
-  nimmPlan(p || demoPlan());
-  if (p) holeLa();
+  /* frühere Fassungen haben Fahrplan und La dauerhaft abgelegt: aufräumen */
+  try { localStorage.removeItem(SPEICHER); localStorage.removeItem(LA_SPEICHER); } catch (e) {}
+  try { var roh = sessionStorage.getItem(SPEICHER); if (roh) { p = JSON.parse(roh); if (!p || p.ver !== 1 || !p.bloecke || !p.bloecke[0] || !p.bloecke[0].zeilen.length) p = null; } } catch (e) { p = null; }
+  if (p) { nimmPlan(p); holeLa(); }
+  else { zeigeLeer(); tick(); zeigeBlatt('t-zug'); }
 })();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (plan) { messe(); tick(); } });
 setInterval(tick, 250);
