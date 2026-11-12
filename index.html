@@ -275,7 +275,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
           <label class="knopf dateiknopf" for="datei">PDF auswählen<input type="file" id="datei" accept="application/pdf,.pdf"></label>
           <button class="knopf" type="button" id="sitzung-weg" hidden>Fahrplan und La löschen</button>
         </div>
-        <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden A4- und A5-Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
+        <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden die zweispaltige und die einspaltige Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
       </div>
       <div class="meldung" id="lade-meldung" role="status" hidden></div>
       <div class="gruppe" id="bericht" hidden>
@@ -427,6 +427,10 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
 
 // Spaltengrenzen relativ zum Blattseitenrahmen (pt); Rahmen-Nullpunkt = x des Kopf-Labels "1" minus 42,1
 var SP = { c2: 59.5, c3a: 89.3, hinw0: 160, hinw1: 205, sym: 218, c3b: 245, c4: 270.3, c5: 320.7, ende: 400 };
+/* Lage der Kopfmarken in der zweispaltigen Form (zwei Blattseiten auf A4 quer): „1“ bei 42,1 pt, „3a“ 120,2 pt und „5“ 299,2 pt
+   rechts davon. Die einspaltige Form (eine Blattseite auf A4 hoch) ist dieselbe Blattseite, rund 1,41-fach vergrößert.
+   Der Maßstab kommt je Blattseite aus dem Abstand „1“ → „3a“; alle Maße werden damit auf die zweispaltige Form zurückgerechnet. */
+var KOPF = { eins: 42.1, dreiA: 120.2, fuenf: 299.2 };
 var RE_KM = /^-?\d+,\d$/;
 var RE_PLUS = /^\+\d+$/;
 var RE_ZEIT = /^(\d{1,2})\.(\d{2})$/;
@@ -472,7 +476,7 @@ async function leseSeite(pdfjsLib, page) {
           if (ops[k] === OPS.rectangle) {
             var p1 = pkt(ctm, co[j], co[j + 1]), p2 = pkt(ctm, co[j] + co[j + 2], co[j + 1] + co[j + 3]);
             var x0 = Math.min(p1[0], p2[0]), x1 = Math.max(p1[0], p2[0]), y0 = Math.min(p1[1], p2[1]), y1 = Math.max(p1[1], p2[1]);
-            if (x1 - x0 > 12 && x1 - x0 < 60 && y1 - y0 > 8 && y1 - y0 < 30) rects.push({ x0: x0, y0: y0, x1: x1, y1: y1 });
+            if (x1 - x0 > 12 && x1 - x0 < 130 && y1 - y0 > 8 && y1 - y0 < 65) rects.push({ x0: x0, y0: y0, x1: x1, y1: y1 });
           }
           j += n;
         }
@@ -504,23 +508,32 @@ function blattseiten(pdfSeiten) {
     var koepfe = [];
     pg.items.forEach(function (a) {
       if (a.s !== '3a') return;
-      var eins = pg.items.find(function (b) { return b.s === '1' && Math.abs(b.y - a.y) < 0.8 && a.x - b.x > 100 && a.x - b.x < 140; });
-      if (eins) koepfe.push({ x0: eins.x - 42.1, y: a.y });
+      var F = null;
+      pg.items.forEach(function (b) {
+        if (F || b.s !== '1') return;
+        var ma = (a.x - b.x) / KOPF.dreiA;
+        if (ma < 0.7 || ma > 2.2 || Math.abs(b.y - a.y) > 0.8 * ma) return;
+        // Gegenprobe: die Marke „5“ steht im selben Maßstab
+        if (!pg.items.some(function (c) { return c.s === '5' && Math.abs(c.y - a.y) <= 0.8 * ma && Math.abs((c.x - b.x) / ma - KOPF.fuenf) < 2.5; })) return;
+        if (Math.abs(ma - 1) < 0.02) ma = 1;
+        F = { x0: b.x - KOPF.eins * ma, y: a.y, ma: ma };
+      });
+      if (F) koepfe.push(F);
     });
     koepfe.sort(function (a, b) { return a.x0 - b.x0; });
     koepfe.forEach(function (F) {
-      var its = [], kopf = [], fuss = [];
+      var m = F.ma, fy = F.y / m, its = [], kopf = [], fuss = [];
       pg.items.forEach(function (it) {
-        var x = it.x - F.x0;
+        var x = (it.x - F.x0) / m, y = it.y / m;
         if (x < 20 || x >= 415) return;
-        var o = { s: it.s, x: x, y: it.y, w: it.w, h: it.h };
-        if (it.y > 570) fuss.push(o); else if (it.y < F.y - 5) kopf.push(o); else if (it.y > F.y + 5) its.push(o);
+        var o = { s: it.s, x: x, y: y, w: it.w / m, h: it.h / m };
+        if (y > 570) fuss.push(o); else if (y < fy - 5) kopf.push(o); else if (y > fy + 5) its.push(o);
       });
-      var rects = pg.rects.filter(function (r) { return r.x0 - F.x0 > 15 && r.x1 - F.x0 < 100; })
-        .map(function (r) { return { x0: r.x0 - F.x0, x1: r.x1 - F.x0, y0: r.y0, y1: r.y1 }; });
+      var rects = pg.rects.map(function (r) { return { x0: (r.x0 - F.x0) / m, x1: (r.x1 - F.x0) / m, y0: r.y0 / m, y1: r.y1 / m }; })
+        .filter(function (r) { return r.x0 > 15 && r.x1 < 100 && r.x1 - r.x0 > 12 && r.x1 - r.x0 < 60 && r.y1 - r.y0 > 8 && r.y1 - r.y0 < 30; });
       var nr = null;
-      fuss.forEach(function (f) { var m = /^Seite (\d+)$/.exec(f.s); if (m) nr = Number(m[1]); });
-      out.push({ nr: nr, pdfSeite: pg.pdfSeite, x0: F.x0, kopf: kopf, fuss: fuss, items: its, rects: rects });
+      fuss.forEach(function (f) { var mm = /^Seite (\d+)$/.exec(f.s); if (mm) nr = Number(mm[1]); });
+      out.push({ nr: nr, pdfSeite: pg.pdfSeite, x0: F.x0, ma: m, kopf: kopf, fuss: fuss, items: its, rects: rects });
     });
   });
   return out;
@@ -609,7 +622,8 @@ function zeilenAus(S) {
 
 /* ---------- 3. Kopfangaben ---------- */
 function leseKopf(S) {
-  var K = { zeilen: [], zug: '', gattung: '', datum: null, datumText: '', fahrplanVom: '', strecke: '', tage: '', tfz: '', last: '', laenge: '', mbr: '', vmax: '', gedruckt: '' };
+  var K = { zeilen: [], zug: '', gattung: '', datum: null, datumText: '', fahrplanVom: '', strecke: '', tage: '', tfz: '', last: '', laenge: '', mbr: '', vmax: '', gedruckt: '', wechsel: [] };
+  var abOrt = '';
   var its = S.kopf.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; }), reihen = [];
   its.forEach(function (it) { var l = reihen[reihen.length - 1]; if (l && Math.abs(it.y - l.y) < 3) l.its.push(it); else reihen.push({ y: it.y, its: [it] }); });
   reihen.forEach(function (r) {
@@ -621,7 +635,14 @@ function leseKopf(S) {
     else if (/^Fahrplan vom/.test(t[0])) K.fahrplanVom = norm(t.slice(1).join(' '));
     else if (/^Buchfahrplan gültig/.test(t[0])) { /* nur in K.zeilen */ }
     else if (/^\d{3,6}$/.test(t[0]) && r.its[0].x < 40) { K.zug = t[0]; K.gattung = t[1] || ''; }
-    else if (/^Tfz /.test(t[0])) { K.tfz = t[0].replace(/^Tfz\s*/, ''); t.slice(1).forEach(function (x) { if (/ t$/.test(x)) K.last = x; else if (/ m$/.test(x)) K.laenge = x; else if (/^Mbr /.test(x)) K.mbr = x.replace(/^Mbr\s*/, ''); }); }
+    else if (/^Tfz /.test(t[0])) {
+      // die erste Tfz-Zeile gilt ab Beginn; weitere (Zeile „ab <Ort>“, darunter neue Tfz-Zeile) gelten ab dem genannten Ort
+      var A = { ab: abOrt, tfz: t[0].replace(/^Tfz\s*/, ''), last: '', laenge: '', mbr: '' };
+      t.slice(1).forEach(function (x) { if (/ t$/.test(x)) A.last = x; else if (/ m$/.test(x)) A.laenge = x; else if (/^Mbr /.test(x)) A.mbr = x.replace(/^Mbr\s*/, ''); });
+      if (!K.tfz) { K.tfz = A.tfz; K.last = A.last; K.laenge = A.laenge; K.mbr = A.mbr; } else K.wechsel.push(A);
+      abOrt = '';
+    }
+    else if (K.tfz && /^ab \S/.test(zeile) && t.length === 1) abOrt = zeile.replace(/^ab\s+/, '');
     else if (/^\d+ km\/h$/.test(t[0])) K.vmax = t[0];
     else if (/ - /.test(zeile) && /[A-Za-zÄÖÜ]{3}/.test(zeile) && !/^\d/.test(zeile) && !K.strecke) K.strecke = zeile;
     else if (/^\d[\d./]* ?- ?\d/.test(zeile)) K.tage = zeile;
@@ -936,7 +957,7 @@ function parse(pdfSeiten, opt) {
   var kopf = leseKopf(S[0]);
   var alle = leseBloecke(S, warn, opt && opt.debug);
   var z = nachbearbeiten(alle, kopf, warn);
-  return { kopf: kopf, regel: alle[0], alternativen: alle.slice(1), blattseiten: S.length, pdfSeiten: pdfSeiten.length, seiten: S.map(function (s) { return { nr: s.nr, pdf: s.pdfSeite, x0: Math.round(s.x0) }; }), zeiten: z.zeiten, basis: z.basis, warnungen: warnungen };
+  return { kopf: kopf, regel: alle[0], alternativen: alle.slice(1), blattseiten: S.length, pdfSeiten: pdfSeiten.length, seiten: S.map(function (s) { return { nr: s.nr, pdf: s.pdfSeite, x0: Math.round(s.x0) }; }), form: S.every(function (s) { return s.ma === 1; }) ? 'zweispaltig' : S.every(function (s) { return s.ma > 1.2; }) ? 'einspaltig' : 'gemischt', massstab: Math.round(S[0].ma * 1000) / 1000, zeiten: z.zeiten, basis: z.basis, warnungen: warnungen };
 }
 
 var api = { lesePdf: lesePdf, parse: parse, blattseiten: blattseiten, zeilenAus: zeilenAus, eintragName: eintragName };
@@ -7529,28 +7550,44 @@ var DREIECK = '<svg class="dreieck" viewBox="0 0 10 8" aria-label="Dreieck"><pat
 var EL_ZEICHEN = { 'Ausschalten erwarten': '1v', 'Ausschalten': '1', 'Einschalten erlaubt': '2', 'Bügel ab erwarten': '3', 'Bügel ab': '4', 'Bügel an': '5', 'für Fahrzeuge mit gehobenem Stromabnehmer': '6' };
 var RE_EL = /E[lL] ?(1v|[1-6])(?![0-9A-Za-zÄÖÜäöüß])/y, RE_WORT = /[0-9A-Za-zÄÖÜäöüß]/;
 function elBild(nr, mitName) { return '<i class="el e' + nr + '"' + (mitName ? ' role="img" aria-label="El ' + nr + '"' : ' aria-hidden="true"') + '></i>'; }
-/* Ausgeschriebene Bedeutung nach dem Signalbuch, die längere Wendung zuerst. „Hauptschalterauslösung“,
-   „Bügel abgesenkt“ und Ähnliches gehören nicht dazu: nach der Wendung darf kein Buchstabe folgen. */
+/* Ausgeschriebene Bedeutung nach dem Signalbuch, die längere Wendung zuerst. Die Klammer umfasst, was beim Bild bleibt.
+   „Hauptschalterauslösung“, „Bügel abgesenkt“ und Ähnliches gehören nicht dazu: nach der Wendung darf kein Buchstabe folgen. */
 var EL_WORTE = [
-  [/Hauptschalter\s+aus(?:schalten|geschaltet)?(?![A-Za-zÄÖÜäöüß])/y, '1'],
-  [/Hauptschalter\s+ein(?:schalten|geschaltet)?(?![A-Za-zÄÖÜäöüß])/y, '2'],
-  [/Bügel\s+ab["“”‘’'»«]?\s+erwarten(?![A-Za-zÄÖÜäöüß])/y, '3'],
-  [/Bügel\s+ab["“”‘’'»«]?\s*-\s*Ankündesignal(?![A-Za-zÄÖÜäöüß])/y, '3'],
-  [/Bügel\s+ab(?![A-Za-zÄÖÜäöüß])/y, '4'],
-  [/Bügel\s+an(?![A-Za-zÄÖÜäöüß])/y, '5']
-];
+  ['(E[lL] ?1)\\s+erwarten', '1v'],
+  ['(E[lL] ?4)\\s+erwarten', '3'],
+  ['(Hauptschalter|H[Ss])\\s+aus(?:schalten|geschaltet)?', '1'],
+  ['(Hauptschalter|H[Ss])\\s+ein(?:schalten|geschaltet)?', '2'],
+  ['(Bügel)\\s+ab["“”‘’\'»«]?\\s+erwarten', '3'],
+  ['(Bügel)\\s+ab["“”‘’\'»«]?\\s*-\\s*Ankündesignal', '3'],
+  ['(Bügel)\\s+ab', '4'],
+  ['(Stromabnehmer)\\s+(?:ab)?senken', '4'],
+  ['(Bügel)\\s+an', '5'],
+  ['(Stromabnehmer)\\s+(?:an)?heben', '5'],
+  ['(Halt)\\s+für\\s+Fahrzeuge\\s+mit\\s+gehobene[mn]\\s+Stromabnehmern?', '6']
+].map(function (w) { return { re: new RegExp(w[0] + '(?![A-Za-zÄÖÜäöüß])', 'y'), c: w[0].charCodeAt(1), nr: w[1] }; });
+/* Verneinung: „kein Bügel ab“, „ohne El 6“, „Bügel ab nicht erforderlich“, „Hauptschalter aus entfällt“, „El 1 ungültig“.
+   Dann steht kein Bild. Zwischen dem verneinenden Wort und der Nennung dürfen nur Füllwörter stehen.
+   „nicht vergessen“ und „nicht nur“ verneinen nicht. Im Zweifel gilt eine Stelle als verneint: dann fehlt nur das Bild. */
+var RE_NEIN_VOR = /(?:^|[^A-Za-zÄÖÜäöüß])(?:kein(?:e[mnrs]?)?|keinesfalls|keineswegs|nicht|niemals|nie|ohne|weder)\s+(?:(?:mehr|das|die|der|den|dem|ein|eine[mnrs]?|Signale?|Sig\.?|erneut(?:e[mnrs]?)?|weitere[mnrs]?|zusätzliche[mnrs]?|neue[mnrs]?)\s+){0,2}["“„‚‘'»«]?$/i;
+var RE_NEIN_NOCH = /(?:^|[^A-Za-zÄÖÜäöüß])noch\s+["“„‚‘'»«]?$/i, RE_WEDER = /(?:^|[^A-Za-zÄÖÜäöüß])weder(?![A-Za-zÄÖÜäöüß])/i;
+var RE_NEIN_NACH = /^["“”‘’'»«]?\s*(?:(?:ist|sind|wird|werden|hier|dort|jedoch|aber)\s+)?(?:nicht(?!\s+(?:vergessen|versäumen|unterlassen|nur)(?![A-Za-zÄÖÜäöüß]))|entfällt|entfallen|aufgehoben|ungültig|abgebaut|unnötig)(?![A-Za-zÄÖÜäöüß])/i;
+function elNein(s, i, len) {
+  var vor = s.slice(Math.max(0, i - 60), i);
+  return RE_NEIN_VOR.test(vor) || (RE_NEIN_NOCH.test(vor) && RE_WEDER.test(s.slice(0, i))) || RE_NEIN_NACH.test(s.substr(i + len, 36));
+}
 /* Nennung oder Bedeutung, die an Stelle i beginnt: { nr, len, halt, wort }, sonst null.
    halt: so viele Zeichen bleiben beim Bild (Bezeichnung ganz, von einer Wendung das erste Wort). */
 function elBei(s, i) {
-  var c = s.charCodeAt(i), m, k;
-  if ((c !== 69 && c !== 72 && c !== 66) || (i > 0 && RE_WORT.test(s.charAt(i - 1)))) return null;
-  if (c === 69) { RE_EL.lastIndex = i; m = RE_EL.exec(s); return m ? { nr: m[1], len: m[0].length, halt: m[0].length, wort: false } : null; }
-  for (k = 0; k < EL_WORTE.length; k++) {
-    EL_WORTE[k][0].lastIndex = i;
-    m = EL_WORTE[k][0].exec(s);
-    if (m) return { nr: EL_WORTE[k][1], len: m[0].length, halt: m[0].search(/\s/), wort: true };
+  var c = s.charCodeAt(i), m, k, n = null;
+  if ((c !== 69 && c !== 72 && c !== 66 && c !== 83) || (i > 0 && RE_WORT.test(s.charAt(i - 1)))) return null;
+  for (k = 0; k < EL_WORTE.length && !n; k++) {
+    if (EL_WORTE[k].c !== c) continue;
+    EL_WORTE[k].re.lastIndex = i;
+    m = EL_WORTE[k].re.exec(s);
+    if (m) n = { nr: EL_WORTE[k].nr, len: m[0].length, halt: m[1].length, wort: true };
   }
-  return null;
+  if (!n && c === 69) { RE_EL.lastIndex = i; m = RE_EL.exec(s); if (m) n = { nr: m[1], len: m[0].length, halt: m[0].length, wort: false }; }
+  return n && !elNein(s, i, n.len) ? n : null;
 }
 /* Bild und Bezeichnung stehen in einem Umschlag, damit der Zeilenumbruch sie nicht trennt */
 var EL_AUF = '<i class="elw">', EL_ZU = '</i>';
@@ -7614,9 +7651,12 @@ function planAusPdf(r, datei) {
   if (k.last) stamm.push(['Last', k.last]);
   if (k.laenge) stamm.push(['Länge', k.laenge]);
   if (k.mbr) stamm.push(['Mindestbremshundertstel', k.mbr]);
+  (k.wechsel || []).forEach(function (w) {
+    stamm.push([w.ab ? 'Ab ' + w.ab : 'Weitere Angabe', ['Tfz ' + w.tfz, w.last, w.laenge, w.mbr ? 'Mbr ' + w.mbr : ''].filter(Boolean).join(' · ')]);
+  });
   if (k.vmax) stamm.push(['Höchstgeschwindigkeit', k.vmax]);
   if (k.gedruckt) stamm.push(['Gedruckt', k.gedruckt]);
-  return { ver: 1, datei: datei || '', kopf: k, stamm: stamm, basisMs: basis, ohneDatum: basis === null, bloecke: [r.regel].concat(r.alternativen), warnungen: r.warnungen, blattseiten: r.blattseiten, pdfSeiten: r.pdfSeiten, seiten: r.seiten };
+  return { ver: 1, datei: datei || '', kopf: k, stamm: stamm, basisMs: basis, ohneDatum: basis === null, bloecke: [r.regel].concat(r.alternativen), warnungen: r.warnungen, blattseiten: r.blattseiten, pdfSeiten: r.pdfSeiten, seiten: r.seiten, form: r.form || '' };
 }
 
 /* ---------- Zeit und Ort ---------- */
@@ -7887,11 +7927,13 @@ function laGeltHtml(g) {
 /* eine Ortsangabe mit ihren Besonderheiten (Spalten 3 und 4, wahlweise 5 und 8) */
 function laTeil(T, mitGeltung, mitGrund) {
   var s = [], bes = T.sym.map(laZeichenHtml), ug = T.sym.indexOf('Signal ungültig oder abgebaut');
+  /* ein ungültiges oder abgebautes Signal bekommt kein Bild */
+  var txt = ug >= 0 ? esc : elText;
   if (T.v) s.push('<b>' + T.v.join('/') + ' km/h</b>');
-  if (T.ortText) s.push(elText(T.ortText));
+  if (T.ortText) s.push(txt(T.ortText));
   T.ortSym.forEach(function (x) { s.push(laZeichenHtml(x)); });
   if (ug >= 0 && /^(abgebaut|ungültig)$/i.test(T.bes)) bes[ug] = esc('Signal ' + T.bes.toLowerCase());
-  else if (T.bes) bes.push(elText(T.bes));
+  else if (T.bes) bes.push(txt(T.bes));
   if (bes.length) s.push('<b>' + bes.join(', ') + '</b>');
   if (mitGeltung && T.geltung) s.push(laGeltHtml(T.geltung));
   if (mitGrund) { var g = laGrundHtml(T); if (g) s.push(g); }
@@ -8332,7 +8374,7 @@ function zeigeBericht() {
   var k = plan.kopf, R = plan.bloecke[0].zeilen, zeiten = 0, vw = 0;
   R.forEach(function (E) { if (E.tAn != null) zeiten++; if (E.tAb != null) zeiten++; if (E.v) vw++; });
   var d = [['Datei', plan.datei || '–'], ['Zug', (k.zug || '–') + (k.gattung ? ' ' + k.gattung : '')], ['Strecke', k.strecke || '–'], ['Blattfahrplan für', k.datumText || 'nicht gelesen'],
-    ['Blattseiten', String(plan.blattseiten)], ['Regelweg', R.length + ' Zeilen, ' + zeiten + ' Fahrzeiten, ' + vw + ' Geschwindigkeitswechsel'], ['Alternativwege', String(plan.bloecke.length - 1)]];
+    ['Blattseiten', String(plan.blattseiten) + (plan.form ? ', ' + plan.form : '')], ['Regelweg', R.length + ' Zeilen, ' + zeiten + ' Fahrzeiten, ' + vw + ' Geschwindigkeitswechsel'], ['Alternativwege', String(plan.bloecke.length - 1)]];
   $('bericht-daten').innerHTML = d.map(function (p) { return '<dt>' + esc(p[0]) + '</dt><dd>' + esc(p[1]) + '</dd>'; }).join('');
   b.hidden = false;
   var w = plan.warnungen || [];
