@@ -30,7 +30,7 @@
   --key-ink:#eef1ed;
   --key-on:#0a3f9c;
   --marker-soft:rgba(10,63,156,.28);
-  --orig-filter:none;
+  --orig-filter:none; --el-filter:none; --el:1.7rem;
   --font-display:"IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",Arial,sans-serif;
   --font-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
   --c-vz:2.25em; --c-band:1.9em; --c-v:calc(var(--c-vz) + var(--c-band)); --c-km:3.6em; --c-g:1.3em; --c-t:3.7em;
@@ -42,7 +42,7 @@
     --line:#4b575b; --line-soft:#262f33; --marker:#86b4ff;
     --repeat:#c4a70f; --repeat-ink:#0c1012;
     --la:#ffa62b; --la-bg:#35260a; --la-ink:#ffd9a0;
-    --key:#1d2427; --key-ink:#d3d9d5; --key-on:#2c5cb4; --marker-soft:rgba(134,180,255,.3); --orig-filter:invert(.9);
+    --key:#1d2427; --key-ink:#d3d9d5; --key-on:#2c5cb4; --marker-soft:rgba(134,180,255,.3); --orig-filter:invert(.9); --el-filter:brightness(.84);
     color-scheme:dark;
   }
 }
@@ -52,7 +52,7 @@
   --line:#4b575b; --line-soft:#262f33; --marker:#86b4ff;
   --repeat:#c4a70f; --repeat-ink:#0c1012;
   --la:#ffa62b; --la-bg:#35260a; --la-ink:#ffd9a0;
-  --key:#1d2427; --key-ink:#d3d9d5; --key-on:#2c5cb4; --marker-soft:rgba(134,180,255,.3); --orig-filter:invert(.9);
+  --key:#1d2427; --key-ink:#d3d9d5; --key-on:#2c5cb4; --marker-soft:rgba(134,180,255,.3); --orig-filter:invert(.9); --el-filter:brightness(.84);
   color-scheme:dark;
 }
 
@@ -130,6 +130,16 @@ button{font:inherit;color:inherit}
 .durch{background-image:linear-gradient(to top right,transparent calc(50% - 1px),currentColor calc(50% - 1px),currentColor calc(50% + 1px),transparent calc(50% + 1px))}
 .osb.durch{background-image:linear-gradient(to top right,transparent calc(50% - 1px),var(--panel) calc(50% - 1px),var(--panel) calc(50% + 1px),transparent calc(50% + 1px));background-color:var(--ink)}
 .dreieck{display:inline-block;width:.8em;height:.62em;vertical-align:.02em}
+/* El-Signale: kleines Bild vor der Nennung, Bilddaten folgen */
+.el{display:inline-block;width:var(--el);height:var(--el);margin:1px .28em 1px 0;vertical-align:middle;background:center / contain no-repeat;filter:var(--el-filter)}
+.elw{font-style:normal;white-space:nowrap}
+.el.e1v{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP+7u7tycnIAYtHY080AAAAgXqIJV6kAAAAdHR0iIiJNa4h+j6CDkaDQycMcVY8AXs+Aj6AAAACWmp7HwbtmZmZ/kKAiY6r27uXGuq4AbuI4ODguTm5MTExLYnlVcY16eXjg1s4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZs7zuAAAAgHRSTlMA////+K///wD//wBOT/////////8A//+2//////9f/2H/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABHLSnIAAAKhSURBVHjatZjtdpswDEBNaAkN7ZqOwEi6td3H+z/jDAkYB8uSZcl/eo6T3ishS3FiTMrqzMdgFFdtnh92g2lU+bvdozJfzbDwlQy1eZn5KoY5/v3xZmh04t9fWhXDwn8qi0rBsOZbw0na0Hl8+RyW+k78QtzgP5/iajjLGbq7+G+GVynD8nwOju8ZVPhyBogvZdjWV9ZQB+rrGTI7Lha/hAHj53Yczs/LoSPwc3KI1zffUJPi58+ljhg/dy7B/YsYVPjphlR+qoFeX56hTqgvp+M48acYuHxqx/H5tBy6DD4lh3B9y2X5uO02Zqiz4sfnEjB/yqq9rV8eK7gdm0vQ/efw99iP69h/hrb79Xas44D5YEn/5m813zzB27z9p6T0NHy/ciRf8DOwDRvA+sKCH4AgaIDnD0MQ6LjI+eQINob4/ZAhuOu46HzgCdY52BW/f7IE6xzM18R/uwTnA1dg39H208uDGaa/fQvcb7kZlJfpHx++jHmc3nesBDOw/Kf9xH8ei3A1nCqxGjj+iz1D9iTBOTD7wPHrMYMGzoHXyXf8mIE1i9zzr904uhpeq+xZFIg/ZkgWWP4hED9ogAXhD5wIP2yYPlnex/333e8S247zm5DBzpTvyyrwbVffbnutmA1n3wBcUIqiKPDzGTZ4HecuVn4xt9vA+UQN9FuXNx/ihlPFuPsizyczByKfnQOZzzQQ6otPDZn4WYZo/woYGPwkA4vf0A3I/MEM5wr9NSexvokdl3g+kw2k+ZPRceznQ8whk4/mkM1HDBn1JXWcQPzIjYzRvwkGQb4J32YE+YG5xJw/5LkkVl+g44TOJ2jImj+kjhN+PtscNPgrQ3tR4a8MwvXddpxO/L5BJ35n0ONfDZr8xv42o8kf1/CR2L//AQbGPrvw2x7IAAAAAElFTkSuQmCC)}
+.el.e1{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP+8u7oFVq1ycnLY08wAYtAAAAAgXqJMa4gAAAAdHR0iIiJbcop+j6CAkKDQycKAj6DJwrsAbuwAAABleYxmZmZ/kKAAXs8iY6o7V3NPYXOOk5cdS3kWTII4ODhMTEwhS3YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACYFjDpAAAAgHRSTlMA//////+v//8A//8ATk//////////AP+2//////////9fYf8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABXnH9gAAAKzSURBVHjatZjZdqMwDIZNnDTQ0qYrQ5JOusz7v+MAAeJFliVb1k3OceD/JMuSdVCKY5366VVBa9TjdtOrtqj+ZnNXWL8YYdUvRGjU06JfhLD4v3+ZCW0Z//fnUxHCqn+vq7oAwdQfCG/ShM7Sl49hze+kX4kT7P2proSjHKFz/J8Jz1KEdX92N32LUERfjhDSlyL4+ZUlNEB+LUJmxWH+SxBi+rkVF9fPi6Ej6OfEgOc3n9CQ/E/vSx3R/9S+FK7fCKGIPp/A1ecS3PzqxRxRc51DsM/n8Obnw2zf1nVgL9MrzvFfV7v3ZZp7MAHuMpXg7U+1eyUBiBXn1RcdQIqhA+YHMoAQA9B/OIAoAeo/LECkL4H9hwdA+1Jo/mEBkIoL9AcuIEgIz1dMQIAQvF/4AJAQvh8TAEDFIfdjCsAj4PNhAsCpOHQ+SQOYMQyGz59JADMG9Tvpv57B+zEVMDxxukx/96qffi+nwHybGoE+Ty9uf5W6m557qQMR7GHAyj2Ar+n76b3t45iEK+GthnPw989sXxpc/qcR/afhDA0nCYuh0h+zacqyq9+MEbRYDHzz9IUJ5v43t3Z0JTznEwD/IwQdM1d/B/gfJIzH5YDbl6bpwwSzDgJm38mIfgsRzIqKA8z8dv5YsRCONTxVRAHB/LoEo+I4gMD5xAkMgNMfcMJacXRAdH/gGMgAor4XA+GYHjRH3yUMgMsWt09Nym+g4sbKiVjN8j+p86H1GyfoeLdj67NiSNJv6YRI/4kRjnX0aw4zv0hfYtyPYgRS/yH3JcH9IcaQqR+NIVs/QsjIL22ayfcfJSTVL4MgqK/gaUZQH+hLif2H3JfE8huoOKHzGSRk9R9SxQnvjx9DCX2DcDoX0TcIwvn1K66M/zahjP83Qjn9K6Gkfjt8mympP1r/w6zf/yAkQ/6kSrulAAAAAElFTkSuQmCC)}
+.el.e2{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP+8u7oFVqxycnLY080AYtAAAABNa4ggXqIAAAAdHR0iIiLQycJ+j6CAkKDJwryAj6AAAABbc4pmZmZ/kKAAXs88WHUiY6qNkpcWTII4ODhMTEwARaAAZ+xca3zEvrgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABNr87tAAAAgHRSTlMA//////+v//8A//8ATk///////wD/tv///////19h/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFP3MTYAAAK4SURBVHjatZjbduMgDEVxSGq7dZt26jq36W3+/yOHOLENGAkJBC9dy03OlhA6KFaKs3r1OaiCq1XP282guqL6m81DYf1ihFm/EKFVL5N+EcIUf/12J3Rl4q/PxyKEWf9JV00Bgq1vCO/ShN7Rl89hru+oX4kT3P2pboSDHKH34r8TXqUI8/7sFn2HUERfjgDpSxHW9ZUltIH6OoTMjsPilyDE9HM7Lq6fl0NP0M/JAa9vPqElxZ/uSz0x/lRfgvs3Qiiizydw9bkEv756Wp6o/ZxDcM+n+ebp8b7+OteB+5jecV78utr9maa5RxvgP6YSVvtT7fYkALHjVv1FB5By6APzAxlAyCHgPxxAlBDyHxYg4ktB/+EBUF+C5h8WAOk4wB+4AJAAz1dMAEAA7xc+IEiA78cEQKDjkPsxBbAi4PNhAsDrOHQ+SQPYOZiFz59JADsH9TXq78/B+zEVYD5xvIz/HtQw/r0cgfk2NQN9Hr+4/VLqYfzcWyOYgdF/qkf952sRboT3RqwGi/6LOUPmJME5JPbBot9eM+jgHNI62dPHCEletOx/u9jRjfDa0Lyowtx0FT9GsAGnn2Wa09//oPtA7wLxgwQbcPmw1m8N3GigfphgA4Dl3smIfhci8AB2ffv1WDERDk14qogCwPr6BKvjOADgfOIEBsDzB5wwdxwdEN2fcA5kAFF/lYMB1BHAh+bo+wQDuGzxddKk+gIdd+2cyGpY8aPOB/+KRfo3TtDRxddn5ZCk39EJEf+JEQ5N9G0Os76IL8Xib3mvvEgEkv+QfUlwf4g5ZOpHc8jWjxAy6kvqOIH4IxNZQv8yCIL6KjzNCOoHfCnRf8i+JFZfoOOEzidIyPIfUscJ7886hxL6FuF4LqJvEYTru+64MvG7hDLxL4Ry+jdCSf3OvJspqX9dwyezf/8Do7tBdxHn8pwAAAAASUVORK5CYII=)}
+.el.e3{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AefgAAACYmJjz7OQAAAAAWshBbJo4YYmsq6pJcJoAAABNd6NqhqGcnJwAY9Z0hJZmZmYfHx8DS5EvLy8mTnY5W3x1cnCwp562tbSOjo4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAyt8HxAAAAgHRSTlMA////I9v/AP//////AP//4P//yij/MP//////jwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARASx8AAAKbSURBVHjatZrbYsIgDECx6KCzbKLTXf//O9fZ2VIgIdCEh82nc4SSBGKVqhlO7S/78a/UMGp/6A778b8Y/9R1cgY38cUM7m99OjmDWfgihsf3fzpPBsVsmPm9H54EDAtf77SAwYT82cD3HCI+u2HN37EbYj634T8/BPzJwBUPLsPnNKTrw2uA+FwGB/LDJ90ecRifw2BQ/vbdWuJvNZT52wwAX0djp/s2g8nGV3YWTXOA+Nomw/uXekM+P4wf7ecxGa+22gDnB/vdpaPaAO6fUXDsthsckn/ygsVAiWkkP4CCGoNB8xskoK8SGr+IgGowhfwJC2gGPD/jAoqhlB9wQdngSvmnICgZHCH/44I/A1ynCfl/FHyhgu4MGxypvvj3Z3R8XB/1IY44Cj9XcJICBJwEqPziCGpcaDBcfKBOc/JzBl5+auDmxwZHPj+0GZQAPzS8qdu0PgMn/x6T0439oi5TjHtm/mMGN/UmMIM52k73Z8BuCPlu2aUD4y7ts3EwsMVZD0TywJQpejAXDSy5LnNjGD8t2UJz8d2qXqp5DoSiUs1fzeH6gZfFd4/d2QB+0PN7sWe8sH9Z+FCA3dgCwysqOFr4Vgt+/9VeKhggwTp+VbsBEIR8Uzpbo4a8oLQ+FYasgHojpxhyAvqNn2DICGo6CnPEgYZUQFt/siER1PHLqxQL6jsuBcO3jfuPfXOvYjSkzY9Pu26QlOIXN3ifNnB0ZfyihkGTzw+mvaMGFpz2jhqtTm/hUwzb+GXDVv76JKAb83O7gYMf1OlBI/mH4/eD2MDFhwxt+YFuaI9f2m7lW5+8gZsfG/j5iYGdH0UcQ3xhBi/CXwzdWYYv/87AynCQeftkNpyk3m75N5xE320RfXfm3v38qV2fX82EOmbsM1bQAAAAAElFTkSuQmCC)}
+.el.e4{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP+9u7kAZNJycnIGV7HY080AAABAZIcAAAAgXqIdHR0iIiKGk6F+j6AAAACAj6AiY6eAj549Z5JmZmZ/kKACYL5/jp6KlJ2gpavs5NwAXss4ODhMTEyboqnKzc0Gkf89cKFIdqYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADf7XJRAAAAgHRSTlMA//////+v//8A/wD/Tk///wD/////tv////////9fYf//////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABVkFCYAAAJYSURBVHjatZhZY4IwDIALWBWPaUVwunlt+/+/cYBylKvNlRd9+r6kIaGqFCSMumVKMGK1nYWZWovyw3AuzBcz1HwhQ6w+Kr6Iocp/uXsb1jL5L5OriKHmb6JACxja/Nxw4DYYi89fQ93fkh+wG+zzCV6GE5/BdPJ/G/Zchvp8Fg3fMojw+QxjfC5Dv7+8hnigv5aBOHFT+XMYXHzqxLn5tBqMB59Sw3R/6YbYK3/8XjKe+WP30vj8OgwifLgByoca/PuLM8SA/mImDpM/xIDl+04cnu9XgyHwfWrA9dffEJPyd+8lQ8zftZfg8wubOItPiUCfhww1Pwmo8TNkaH6/RAty6L6hyT/6nZHjovXR7nQr//Q7pMeuY+Dmdw2GnV8aLk0ftuz80lBtDXUv+c8k+uPjh+EqeteQqaz8vFRF8cRDB8mz+DK7KzW3i+KIr89gsyz526IJL8ORz9DwP/JnKH+SmA1tflxUwGzo8S3Dg/X842Yd1YZVmq4okepe/m3DWdPeBsULYSh/y0CLaDHCrwx7TXpjTvDXdEPOr8/H9K8VleGk0beWaLi/XcNOI+9d0Wb0fBgM7fzN2OW0Mhw04u7rOB9iDZ58dA3efKTBo7+kiQPkjzJMzi+DAcEHGVB8wF5y7B+XwbmXwP0FThzw+QQbvPYPYeLQ5+NZA5HvrIHMdxgI/fWaOIb8Jw2o+QUYGPmDBlb+wF5C7h/vvcTW35GJY3o+Rw2k/eM1cczn069Bgt8yXBMRfsvA3N/+xMnkbxtk8m8McvyXQZK/zv+bkeQXkd2A8/sPGc0+hTHTelgAAAAASUVORK5CYII=)}
+.el.e5{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP+9u7kAZNJycnIGV7HY08wAAABAY4cAAAAgXqIdHR0iIiJ+j6CIlaKAj6AAAAAlY6aFkZ1mZmZ+jp6Bj56epavr5d07apx/kKABYL8AXtM4ODhMTEzKzc4Fkf9Xan5Hd6agpqzEurHIwbkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAjb4jvAAAAgHRSTlMA//////+v//8A/wD/Tk////8A//+2//////////9fYf////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANl3Li4AAALfSURBVHjatZlZY6MgEIBRQ41r06YYe2y3xx7t//+J6xEFkbkUeMlL8n0zjINAlJIMo95blXBU6nTIW1Un5ef5TWJ+MsPMT2So1N3ET2KY4j9eroY6TfzHRicxWH6h9VN8g8P/e0lgMJb/8yU/69izNNd34OfRDdUi/nw0RJwl48V/NTzGMjjz07zMjeYYYvHLrPzK7fiR6fsYBssvsvLgCooohrm+t0W2EkQwzPF3/HUGXQ4P+yrtxl+sBbsNC34gg8Fw3m5Y8oOCXTmYJT8s2JHDsr6gYLPBmx9Y0Bte5Qbjxw8LMqfj6i39ayMFBJm8p0N8RCA2BPmYQGhY15cUiAzVur60QNBxQPyUgG0A+ZSA2XEwnxSwcjAwnxYwcoDqyxSQBmR+eAJiXTJY/DwBui6F+1coQDqO4jMFoIHkcwWAAa+vSBA0VHh9ZYJAxzHilwhWBhZfIvA6zrD4IoGbQzdOHL5M4OagPobffTY4Xyjovv42nuNa1Q6fl7eMikmWQdF89t87fCh1cz0URcyg498eB/6pL8JoeNDRamD5d90z1D1JnBxEfWD5VZ9BzclB0sken2cQrEV2/iu7HI2Ge717LQrEzzOw3wdFGYifYeC+0UA+ZWC+kxF+jRt4uwpbX7PeVkyGV71xVwHW1zcEO46zsws+n1wDY2+6WB9wQ6Dj6N01MT9UDuT5gMVHcqBOOEw+bCDOaGR9yY7DT5ns+GEDek5G+pdtwE76Yn7IgNxVbOAH1iX4tgVdfyiDXZfA+yJhfcGOg268RM8nZgDu7BjrD7PjwreOG+cnlEPw3nQX38shdPO7k780hDLYWl+g41YZ7I3fM/iCDf2LG36X35b/T2ex+JPhcfrrqR/PMfm1NZwtf8v6wzY8/8ri1Nc3XEaD5Z/i8D2DG79RKq7hSes/OvL8+IYiCd+dpSYJ3zFEru+649LEvzSkid8a0vFHQ0p+3d3NpOT3o30X9u9/Fns+cJrQzScAAAAASUVORK5CYII=)}
+.el.e6{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP8AYtG7u7vZ1M1ycnIAAAAgXqINXLEAAADx6uIdHR0iIiJ9jqCBkKClqq5Ba5mAj6AAXcMAbOQkYaM7aJlZeJkAAAB9kKGeparg2dFmZmYUZ7uHlJ/AvbnKzc44ODgiWJRMTExLdqNge5oFcN7AwL/l494AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC0oYi0AAAAgHRSTlMA//////n/rwD//wD/Tk//////////////AP///7b/////X/9h//////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAENy9yEAAAL5SURBVHjatZjrcqMwDEYdGxJKSEghhZLdpNvbXt7/BRcMGAy+yEZm+qPNTM+RLOsbJoS4PA35uJOAT0JOMb2TY1A+pYfA/GAGwQ9kSMh55AcxjPXvL4PhGKb+fXUNYhD8J7aLAhjm/NZQYhsaiY/fg5gv5+/QDfL57HrDDc/QLOofDDmWQZxPOvElQxA+nkHHxzKs54trSBTzlQwbN05dP0MzKPlsYdiwcRo+i5B6aDT878tVnoNnD8r5tr8WGf2BYdCdT521Hy4NHrnUaOrn/LXBOZeU+zvx9YaN/CITbxXPWwwA/iaDbr4jPxMGv/Q23E/+3D5/qnsAbpyt/jJi9RaDjX+J2j+r0ZA655K9/h1jeoO1h8ZeP09TVu3Vp2TpwTZfzpcNTrlkzJ/u/vR8s8GQS5b8oXnPfykeRoM2l2z5M/JfaZyCDI75MPHp0gBKDRe+j8F2/2W+ymDOJdv9LBd8aw+LjYPsr8yfDJBcSiD7u+CvDfpcaoD1/6bUxVBOc1C+f4r7f9HwhWFMb11qkC/Of6/U/Lf+gvzJKVUZumz9/DcYIslwfeOf3sl9DhLP47n/r0Gc/lIIcjaLH5p9zwtsz+6dF/FFyGEWxdOTDobh6BSG15eugeEoaFbII3ziNzg+dUM4TMN0MAz80sg/t3eovUmwHmL3+s/tDpDJUDoYgPUn/Sq7G0D808if5pADDQM/h9UPMqRzg5mfKup3M/jxoYa/S34N5R9hc3gURr6Yb7N+rRgNN6OB8R+RDzVkvkuDZeMg+ZCoX+1gBsD+NrqXU9jGQffXtwdY/nj3MH4x68kHGDznC9+4bfVDDfB88DNs5dsM8PyxTVptcMkfm0GVS27547xxsbb+xO0rL50hql3zx3XjMM7H3AMWX98DFt9i2DBf+8bh1G80eO2vgwGRrzSg8hW55Jk/4FxCm69m45Dup9awKX9AG4d8PuseQvBnhmsVhD8zIM93vXFh6pcNYeqfDOH4vSEk/9h+NxOS3z33D8f9/Q9+YU9j88DIKgAAAABJRU5ErkJggg==)}
 
 /* Grafikspalte: Tunnel, maßgebende Neigung (Sägelinie), La-Abschnitt */
 .z.tu .c.g::before{content:"";position:absolute;top:0;bottom:0;left:22%;width:0;border-left:2px solid var(--ink)}
@@ -215,7 +225,6 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
 .haltekopf{display:flex;gap:1rem;font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
 .haltekopf span:first-child{flex:1}
 .haltekopf .zt{font-family:inherit;font-weight:400}
-.knopf.lang{text-align:left;white-space:normal;max-width:100%}
 .liste li.block{display:block}
 .liste li.block span{display:block}
 .quelle{font-size:.74rem;color:var(--ink-soft);max-width:65ch;margin:0}
@@ -310,15 +319,6 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <span class="gl">Geladen</span>
         <ul class="liste" id="la-docs"></ul>
       </div>
-      <div class="gruppe" id="la-filtergruppe" hidden>
-        <span class="gl" id="lf-zeichentitel">Ausblenden nach Zeichen, nur Einträge ohne Geschwindigkeit</span>
-        <div class="reihe" id="lf-zeichen"></div>
-        <span class="gl" id="lf-geltungtitel">Ausblenden nach Geltung, auch Einträge mit Geschwindigkeit</span>
-        <div class="reihe" id="lf-geltung"></div>
-        <span class="gl">Ausblenden nach Stand</span>
-        <div class="reihe"><button class="knopf" type="button" id="lf-ruht" aria-pressed="false">Nicht in Kraft</button></div>
-        <p class="klar" id="lf-text"></p>
-      </div>
       <div class="gruppe" id="la-weggruppe" hidden>
         <span class="gl" id="la-wegtitel">Auf dem Laufweg</span>
         <p class="klar" id="la-wegtext"></p>
@@ -333,7 +333,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <div class="gruppe" id="la-alle"></div>
       </details>
       <details class="gruppe" id="la-ausgruppe" hidden>
-        <summary class="gl" id="la-austitel">Ausgeblendet</summary>
+        <summary class="gl" id="la-austitel">Nur Gegengleis, mit GW</summary>
         <div class="gruppe" id="la-aus"></div>
       </details>
       <div class="gruppe" id="la-hinweisgruppe" hidden>
@@ -411,8 +411,8 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     <button class="taste" type="button" id="t-zug" aria-pressed="false">Zug</button>
     <button class="taste" type="button" id="t-fsd" aria-pressed="false">FSD</button>
     <button class="taste" type="button" id="t-lw" aria-pressed="false">LW</button>
-    <button class="taste" type="button" id="t-la" aria-pressed="false">La</button>
     <button class="taste" type="button" id="t-gw" aria-pressed="false" aria-label="Fahrt auf dem Gegengleis">GW</button>
+    <button class="taste" type="button" id="t-la" aria-pressed="false">La</button>
     <button class="taste" type="button" id="t-ab" aria-label="Marker eine Zeile zurück">▼</button>
     <button class="taste" type="button" id="t-auf" aria-label="Marker eine Zeile vor">▲</button>
     <button class="taste" type="button" id="t-zeit" aria-pressed="false">Zeit</button>
@@ -7503,8 +7503,8 @@ var blaetternBis = 0, markerEl = null, fenster = null, merk = null;
 var gw = false, GW_SPEICHER = 'fahrplananzeige.gw', ggCache = new WeakMap();
 /* Zeile des Fahrplans -> Index in der Anzeige; Lage der Geschwindigkeitslinie je Anzeigezeile (0 links … 1 rechts) */
 var zVon = new Map(), vFrac = [];
-/* La-Filter: Zeichen und Geltungen, deren Einträge nicht in der Anzeige stehen sollen */
-var laFilter = { zeichen: {}, geltung: {}, ruht: false }, laAus = { n: 0, gw: 0, zeichen: 0, geltung: 0, ruht: 0 }, laKlassen = { zeichen: [], geltung: [] }, LAF_SPEICHER = 'fahrplananzeige.lafilter2';
+/* La: Zahl der Einträge, die nur fürs Gegengleis gelten und ohne GW nicht erscheinen */
+var laAus = { n: 0 };
 /* Ortung: Verzeichnis, Wegachse des Abschnitts, Weg je Anzeigezeile, laufende Ortung */
 var ortDaten = null, ortAchse = null, ortS = [], ortung = null, ortWache = null, ortHalt = 0, ortUngenau = 0, ortZeig = null;
 var wachSperre = null, wachSoll = false;
@@ -7523,11 +7523,55 @@ function fmtPlan(min) { var m = ((Math.round(min) % 1440) + 1440) % 1440; return
 function fmtVersp(ms) { var m = Math.round(ms / 60000); return (m > 0 ? '+' + m : m < 0 ? '−' + Math.abs(m) : '±0') + ' min'; }
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
 var DREIECK = '<svg class="dreieck" viewBox="0 0 10 8" aria-label="Dreieck"><path d="M1 1h8L5 7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+/* El-Signale: kleines Bild vor jeder Nennung („El 1v“, „El 1“ … „El 6“), vor den La-Zeichen gleicher Bedeutung
+   und vor der ausgeschriebenen Bedeutung („Hauptschalter aus“, „Bügel ab“ …).
+   mitName: das Bild steht für sich (La-Zeichen, Bedeutung), sonst folgt die Bezeichnung als Text. */
+var EL_ZEICHEN = { 'Ausschalten erwarten': '1v', 'Ausschalten': '1', 'Einschalten erlaubt': '2', 'Bügel ab erwarten': '3', 'Bügel ab': '4', 'Bügel an': '5', 'für Fahrzeuge mit gehobenem Stromabnehmer': '6' };
+var RE_EL = /E[lL] ?(1v|[1-6])(?![0-9A-Za-zÄÖÜäöüß])/y, RE_WORT = /[0-9A-Za-zÄÖÜäöüß]/;
+function elBild(nr, mitName) { return '<i class="el e' + nr + '"' + (mitName ? ' role="img" aria-label="El ' + nr + '"' : ' aria-hidden="true"') + '></i>'; }
+/* Ausgeschriebene Bedeutung nach dem Signalbuch, die längere Wendung zuerst. „Hauptschalterauslösung“,
+   „Bügel abgesenkt“ und Ähnliches gehören nicht dazu: nach der Wendung darf kein Buchstabe folgen. */
+var EL_WORTE = [
+  [/Hauptschalter\s+aus(?:schalten|geschaltet)?(?![A-Za-zÄÖÜäöüß])/y, '1'],
+  [/Hauptschalter\s+ein(?:schalten|geschaltet)?(?![A-Za-zÄÖÜäöüß])/y, '2'],
+  [/Bügel\s+ab["“”‘’'»«]?\s+erwarten(?![A-Za-zÄÖÜäöüß])/y, '3'],
+  [/Bügel\s+ab["“”‘’'»«]?\s*-\s*Ankündesignal(?![A-Za-zÄÖÜäöüß])/y, '3'],
+  [/Bügel\s+ab(?![A-Za-zÄÖÜäöüß])/y, '4'],
+  [/Bügel\s+an(?![A-Za-zÄÖÜäöüß])/y, '5']
+];
+/* Nennung oder Bedeutung, die an Stelle i beginnt: { nr, len, halt, wort }, sonst null.
+   halt: so viele Zeichen bleiben beim Bild (Bezeichnung ganz, von einer Wendung das erste Wort). */
+function elBei(s, i) {
+  var c = s.charCodeAt(i), m, k;
+  if ((c !== 69 && c !== 72 && c !== 66) || (i > 0 && RE_WORT.test(s.charAt(i - 1)))) return null;
+  if (c === 69) { RE_EL.lastIndex = i; m = RE_EL.exec(s); return m ? { nr: m[1], len: m[0].length, halt: m[0].length, wort: false } : null; }
+  for (k = 0; k < EL_WORTE.length; k++) {
+    EL_WORTE[k][0].lastIndex = i;
+    m = EL_WORTE[k][0].exec(s);
+    if (m) return { nr: EL_WORTE[k][1], len: m[0].length, halt: m[0].search(/\s/), wort: true };
+  }
+  return null;
+}
+/* Bild und Bezeichnung stehen in einem Umschlag, damit der Zeilenumbruch sie nicht trennt */
+var EL_AUF = '<i class="elw">', EL_ZU = '</i>';
+/* Text der La mit El-Bildern */
+function elText(s) {
+  s = String(s);
+  var o = '', p = 0, n;
+  for (var i = 0; i < s.length; i++) {
+    n = elBei(s, i);
+    if (n) { o += esc(s.slice(p, i)) + EL_AUF + elBild(n.nr, n.wort) + esc(s.substr(i, n.halt)) + EL_ZU; p = i + n.halt; i += n.len - 1; }
+  }
+  return o + esc(s.slice(p));
+}
+/* Bild vor einem La-Zeichen; das erste Wort bleibt beim Bild */
+function elVor(nr, text) { var k = text.indexOf(' '); return EL_AUF + elBild(nr, true) + esc(k < 0 ? text : text.slice(0, k)) + EL_ZU + esc(k < 0 ? '' : text.slice(k)); }
 /* Sonderzeichen der Fahrplanschrift */
 function sym(s) {
-  var o = '';
+  var o = '', zu = -1, n;
   for (var i = 0; i < s.length; i++) {
     var c = s.charAt(i);
+    if (zu < 0 && (n = elBei(s, i))) { o += EL_AUF + elBild(n.nr, n.wort); zu = i + n.halt - 1; }
     if (c === '<') o += '‹'; else if (c === '>') o += '›';
     else if (c === 'á') o += '<span class="osb" title="Oberstrombegrenzung">1</span>';
     else if (c === 'â') o += '<span class="osb durch" title="Ende Oberstrombegrenzung">1</span>';
@@ -7538,18 +7582,21 @@ function sym(s) {
     else if (c === 'ú') o += '<span class="kasten durch">ETCS</span>';
     else if (c === '&') o += '<span class="kasten">LZB</span>';
     else o += esc(c);
+    if (i === zu) { o += EL_ZU; zu = -1; }
   }
   return o;
 }
 
 /* wie sym(), Angaben in spitzen Klammern (Gegengleis) hervorgehoben; st.drin: Klammer aus der Zeile davor noch offen */
 function symGg(l, st) {
-  var o = st.drin ? '<span class="gg">' : '';
+  var o = st.drin ? '<span class="gg">' : '', zu = -1, n;
   for (var i = 0; i < l.length; i++) {
     var c = l.charAt(i);
+    if (zu < 0 && (n = elBei(l, i))) { o += EL_AUF + elBild(n.nr, n.wort); zu = i + n.halt - 1; }
     if (c === '<') { if (!st.drin) { o += '<span class="gg">'; st.drin = true; } o += '‹'; }
     else if (c === '>') { o += '›'; if (st.drin) { o += '</span>'; st.drin = false; } }
     else o += sym(c);
+    if (i === zu) { o += EL_ZU; zu = -1; }
   }
   return o + (st.drin ? '</span>' : '');
 }
@@ -7644,10 +7691,10 @@ function schritt(richtung) {
 
 /* Anzeigezeile für Anfang oder Ende eines La-Eintrags */
 function laZeile(t, typ, basis) {
-  var e = t.e, v = null, km = '', k;
-  e.teile.forEach(function (T) { if (T.v) T.v.forEach(function (x) { if (v === null || x < v) v = x; }); });
-  if (typ === 'a') { var T0 = e.teile[0]; km = T0 ? (T0.von !== null ? T0.vonText : T0.punkte.length ? T0.punkte[0].text : '') : ''; }
-  else for (k = e.teile.length - 1; k >= 0 && !km; k--) if (e.teile[k].von !== null) km = e.teile[k].bisText;
+  var e = t.e, v = null, km = '', k, S = laSicht(e);
+  S.forEach(function (T) { if (T.v) T.v.forEach(function (x) { if (v === null || x < v) v = x; }); });
+  if (typ === 'a') { var T0 = S[0]; km = T0 ? (T0.von !== null ? T0.vonText : T0.punkte.length ? T0.punkte[0].text : '') : ''; }
+  else for (k = S.length - 1; k >= 0 && !km; k--) if (S[k].von !== null) km = S[k].bisText;
   var nb = basis[Math.min(basis.length - 1, Math.max(0, typ === 'a' ? t.p0 : t.p1))];
   return { lar: t, laTyp: typ, lv: v, aktiv: t.st === 'jetzt' || t.st === 'bald', kms: km ? [km] : [], plus: [], seite: nb ? nb.seite : 0 };
 }
@@ -7678,54 +7725,41 @@ function og(E) {
   return c;
 }
 /* La: Bestandteile der Spalte „Geltung“ einer Angabe */
-var RE_LA_GG = /^gilt nur für (gegengleis|dchg hgl der gegenri)/i;
-var RE_LA_GLEIS = /^gilt nur für (regelgleis|gegengleis|dchg hgl der gegenri|dchg hgl und nicht dchg hgl|dchg hgl|nicht dchg hgl)$/i;
 function laGeltung(T) { return (T.geltung || '').split(' · ').map(function (x) { return x.trim(); }).filter(Boolean); }
-/* Grund, aus dem eine Angabe nicht gezeigt wird: 'gw' (gilt nur fürs Gegengleis), 'geltung', 'zeichen' oder '' */
-function laTeilAus(T) {
-  var g = laGeltung(T), k;
-  for (k = 0; k < g.length; k++) if (!gw && RE_LA_GG.test(g[k])) return 'gw';
-  for (k = 0; k < g.length; k++) if (laFilter.geltung[g[k]]) return 'geltung';
-  if (!T.v && T.sym.length && !T.ortSym.length && T.sym.every(function (x) { return x && laFilter.zeichen[x]; })) return 'zeichen';
-  return '';
+/* Gleisangaben dieser Spalte: „Gilt nur für Regelgleis“, „Gilt nur für dchg Hgl der Gegenri und Gegengleis“ … */
+var RE_LA_NUR = /^gilt nur für (.+)$/i, RE_LA_GLEIS = /^(regelgleis|gegengleis|(nicht )?dchg hgl( (der )?gegenri(chtung)?)?)$/i, RE_LA_GG = /^(gegengleis|dchg hgl (der )?gegenri(chtung)?)$/i;
+/* Angabe gilt nur für das Gegengleis oder das durchgehende Hauptgleis der Gegenrichtung: jede genannte Gleisart
+   gehört dazu. Nennt sie auch ein anderes Gleis („… und nicht dchg Hgl“) oder keines, gilt sie immer. */
+function laTeilGg(T) {
+  var arten = [];
+  laGeltung(T).forEach(function (x) {
+    var m = RE_LA_NUR.exec(x);
+    if (!m) return;
+    var gl = m[1].split(/\s+und\s+|\s*,\s*/).map(function (y) { return y.trim(); });
+    if (gl.every(function (y) { return RE_LA_GLEIS.test(y); })) arten = arten.concat(gl);
+  });
+  return arten.length > 0 && arten.every(function (y) { return RE_LA_GG.test(y); });
 }
-function laEintragAus(o) {
-  var T = o.e.teile, gr = T.map(laTeilAus);
-  if (T.length && gr.every(Boolean)) return gr.indexOf('gw') >= 0 ? 'gw' : gr[0];
-  if (laFilter.ruht && (o.st === 'vorbei' || o.st === 'spaeter')) return 'ruht';
-  return '';
-}
+/* Gezeigte Angaben eines Eintrags: ohne GW entfallen die, die nur dort gelten. Sonst wird alles gezeigt. */
+function laSicht(e) { return gw ? e.teile : e.teile.filter(function (T) { return !laTeilGg(T); }); }
+/* Ein Eintrag erscheint ohne GW nicht, wenn alle seine Angaben nur dort gelten */
+function laEintragAus(o) { return o.e.teile.length > 0 && !laSicht(o.e).length; }
 /* Fahrplanzeilen des Abschnitts, dazwischen die eingeordneten La-Einträge */
 function baueZeilen() {
   var basis = plan.bloecke[akt].zeilen, n = basis.length, k, bei = new Array(n + 1);
-  laZu = null; laBer = []; laIn = []; laAus = { n: 0, gw: 0, zeichen: 0, geltung: 0, ruht: 0 }; laKlassen = { zeichen: [], geltung: [] };
+  laZu = null; laBer = []; laIn = []; laAus = { n: 0 };
   function leg(p, z) { p = Math.max(0, Math.min(n, p)); (bei[p] = bei[p] || []).push(z); }
   if (laDocs.length) {
     laZu = TagesLa.ordne(basis, laDocs, nameVon);
-    var kz = {}, kg = {};
-    var filtere = function (o) {
-      o.st = laStand(o);
-      var z = {}, g = {};
-      o.e.teile.forEach(function (T) {
-        if (!T.v && !T.ortSym.length) T.sym.forEach(function (x) { if (x) z[x] = true; });
-        laGeltung(T).forEach(function (x) { if (!RE_LA_GLEIS.test(x) && !RE_LA_GG.test(x)) g[x] = true; });
-      });
-      Object.keys(z).forEach(function (x) { kz[x] = (kz[x] || 0) + 1; });
-      Object.keys(g).forEach(function (x) { kg[x] = (kg[x] || 0) + 1; });
-      o.grundAus = laEintragAus(o);
-      o.aus = !!o.grundAus;
-      if (o.aus) { laAus.n++; laAus[o.grundAus]++; }
-    };
-    laZu.offen.forEach(filtere);
+    var bewerte = function (o) { o.st = laStand(o); o.aus = laEintragAus(o); if (o.aus) laAus.n++; };
+    laZu.offen.forEach(bewerte);
     /* Ende-Zeile und Schraffur nur für geltende Einträge mit Geschwindigkeit */
     laZu.eintraege.forEach(function (t, i) {
-      t.id = i; filtere(t);
+      t.id = i; bewerte(t);
       var a = laZeile(t, 'a', basis);
       t.ende = !t.aus && t.p1 !== null && a.lv != null && a.aktiv && t.lageOk;
       t.zeileA = a;
     });
-    var liste = function (m) { return Object.keys(m).map(function (x) { return { name: x, n: m[x] }; }).sort(function (a, b) { return b.n - a.n || (a.name < b.name ? -1 : 1); }); };
-    laKlassen = { zeichen: liste(kz), geltung: liste(kg) };
     laSig = laZu.eintraege.map(function (t) { return t.st; }).join(',');
     laZu.eintraege.forEach(function (t) { if (t.ende && t.p1 > t.p0) leg(t.p1, laZeile(t, 'e', basis)); });
     laZu.eintraege.forEach(function (t) { if (!t.aus) { leg(t.p0, t.zeileA); if (t.ende && t.p1 <= t.p0) leg(t.p0, laZeile(t, 'e', basis)); } delete t.zeileA; });
@@ -7843,18 +7877,24 @@ function kmText(E) {
 function laGueltig(d, t) { return t >= d.vonMs && t < d.bisMs; }
 function fmtTag(ms) { var d = new Date(ms); return z2(d.getDate()) + '.' + z2(d.getMonth() + 1) + '.'; }
 function laZeichen(liste) { return liste.map(function (x) { return x || 'Zeichen nicht erkannt'; }); }
+function laZeichenHtml(x) { var n = x || 'Zeichen nicht erkannt', nr = EL_ZEICHEN[n]; return nr ? elVor(nr, n) : esc(n); }
 function laGrund(T) { return laZeichen(T.grundSym).concat(T.gruende.map(function (g) { return g.replace(/^- /, '– '); })).join(' · '); }
+function laGrundHtml(T) { return T.grundSym.map(laZeichenHtml).concat(T.gruende.map(function (g) { return elText(g.replace(/^- /, '– ')); })).join(' · '); }
+/* Spalte „Geltung“: Zeichen stehen dort in eckigen Klammern */
+function laGeltHtml(g) {
+  return String(g).split(' · ').map(function (x) { var m = /^\[(.+)\]$/.exec(x), nr = m && EL_ZEICHEN[m[1]]; return nr ? elVor(nr, x) : elText(x); }).join(' · ');
+}
 /* eine Ortsangabe mit ihren Besonderheiten (Spalten 3 und 4, wahlweise 5 und 8) */
 function laTeil(T, mitGeltung, mitGrund) {
-  var s = [], bes = laZeichen(T.sym), ug = bes.indexOf('Signal ungültig oder abgebaut');
+  var s = [], bes = T.sym.map(laZeichenHtml), ug = T.sym.indexOf('Signal ungültig oder abgebaut');
   if (T.v) s.push('<b>' + T.v.join('/') + ' km/h</b>');
-  if (T.ortText) s.push(esc(T.ortText));
-  laZeichen(T.ortSym).forEach(function (x) { s.push(esc(x)); });
-  if (ug >= 0 && /^(abgebaut|ungültig)$/i.test(T.bes)) bes[ug] = 'Signal ' + T.bes.toLowerCase();
-  else if (T.bes) bes.push(T.bes);
-  if (bes.length) s.push('<b>' + esc(bes.join(', ')) + '</b>');
-  if (mitGeltung && T.geltung) s.push(esc(T.geltung));
-  if (mitGrund) { var g = laGrund(T); if (g) s.push(esc(g)); }
+  if (T.ortText) s.push(elText(T.ortText));
+  T.ortSym.forEach(function (x) { s.push(laZeichenHtml(x)); });
+  if (ug >= 0 && /^(abgebaut|ungültig)$/i.test(T.bes)) bes[ug] = esc('Signal ' + T.bes.toLowerCase());
+  else if (T.bes) bes.push(elText(T.bes));
+  if (bes.length) s.push('<b>' + bes.join(', ') + '</b>');
+  if (mitGeltung && T.geltung) s.push(laGeltHtml(T.geltung));
+  if (mitGrund) { var g = laGrundHtml(T); if (g) s.push(g); }
   return s.join(' · ');
 }
 function laFrist(e, d) {
@@ -7875,13 +7915,14 @@ function laZeileHtml(E, i) {
   }
   if (t.st === 'alt') kl.push('alt');
   if (t.st === 'vorbei' || t.st === 'spaeter') kl.push('ruht');
-  var T = e.teile, gelt = laGleich(T, function (x) { return x.geltung; }), grund = laGleich(T, laGrund), max = 4, k, zus = [];
+  var T = laSicht(e), nGg = e.teile.length - T.length, gelt = laGleich(T, function (x) { return x.geltung; }), grund = laGleich(T, laGrund), max = 4, k, zus = [];
   var tx = '<span class="la-inhalt"><b>' + (e.neu ? '+ ' : '') + nr + '</b>' + (t.sicher ? '' : '<span class="la-q" title="Einordnung unsicher">?</span>') + ' <span class="la-str">' + esc(t.B.nr + t.B.ri) + '</span>' + (T.length ? ' · ' + laTeil(T[0], gelt === null, grund === null) : '');
   for (k = 1; k < T.length && k < max; k++) tx += '<span class="la-zus">' + laTeil(T[k], gelt === null, grund === null) + '</span>';
   if (T.length > max) tx += '<span class="la-zus">+ ' + (T.length - max) + ' weitere Angaben, antippen</span>';
-  if (gelt) zus.push('<span class="la-gelt">' + esc(gelt) + '</span>');
-  if (grund) zus.push(esc(grund));
+  if (gelt) zus.push('<span class="la-gelt">' + laGeltHtml(gelt) + '</span>');
+  if (grund) zus.push(laGrundHtml(T[0]));
   if (zus.length) tx += '<span class="la-zus">' + zus.join(' · ') + '</span>';
+  if (nGg) tx += '<span class="la-zus">+ ' + nGg + (nGg === 1 ? ' Angabe' : ' Angaben') + ' nur für das Gegengleis, mit GW</span>';
   tx += '</span>';
   var fr = laFrist(e, d);
   if (t.st === 'vorbei') tx += '<span class="la-zus la-gelt">außer Kraft seit ' + esc(e.ausserKraft.text) + '</span>';
@@ -8002,7 +8043,7 @@ function zeigeChips(t) {
     laAlt = alte.map(function (d) { return d.bereich; }).join(',');
     var einTag = laDocs.every(function (d) { return d.tagMs === laDocs[0].tagMs; });
     if (alte.length) laTxt = 'La ' + alte.map(function (d) { return d.bereich + ' vom ' + fmtTag(d.tagMs); }).join(', ') + ' gilt nicht für heute';
-    else laTxt = 'La ' + (einTag ? fmtTag(laDocs[0].tagMs) + ' ' + laDocs.map(function (d) { return d.bereich; }).join(', ') : laDocs.map(function (d) { return d.bereich + ' ' + fmtTag(d.tagMs); }).join(', ')) + (laZu && laZahl().off ? ' · ' + laZahl().off + ' offen' : '') + (laAus.n ? ' · ' + laAus.n + ' ausgeblendet' : '');
+    else laTxt = 'La ' + (einTag ? fmtTag(laDocs[0].tagMs) + ' ' + laDocs.map(function (d) { return d.bereich; }).join(', ') : laDocs.map(function (d) { return d.bereich + ' ' + fmtTag(d.tagMs); }).join(', ')) + (laZu && laZahl().off ? ' · ' + laZahl().off + ' offen' : '') + (laAus.n ? ' · ' + laAus.n + ' nur mit GW' : '');
   }
   var stand = [ausser, txt, gw, laTxt, laAlt].join('|');
   if (stand === chipsStand) return;
@@ -8071,18 +8112,7 @@ function fuelleLa() {
   }).join('');
   $('la-hinweisgruppe').hidden = !hin.length;
   $('la-hinweise').innerHTML = hin.join('');
-  var wg = $('la-weggruppe'), og = $('la-offengruppe'), ag = $('la-allegruppe'), fg = $('la-filtergruppe'), xg = $('la-ausgruppe');
-  fg.hidden = !laDocs.length || !laZu;
-  var wahl = function (liste, art, an) {
-    return liste.map(function (k) { return '<button class="knopf lang" type="button" data-' + art + '="' + esc(k.name) + '" aria-pressed="' + (an[k.name] ? 'true' : 'false') + '">' + esc(k.name) + ' <span class="num">(' + k.n + ')</span></button>'; }).join('');
-  };
-  $('lf-zeichen').innerHTML = wahl(laKlassen.zeichen, 'lfz', laFilter.zeichen);
-  $('lf-geltung').innerHTML = wahl(laKlassen.geltung, 'lfg', laFilter.geltung);
-  $('lf-zeichen').hidden = $('lf-zeichentitel').hidden = !laKlassen.zeichen.length; $('lf-geltung').hidden = $('lf-geltungtitel').hidden = !laKlassen.geltung.length;
-  $('lf-ruht').setAttribute('aria-pressed', String(laFilter.ruht));
-  var teileAus = [laAus.zeichen ? laAus.zeichen + ' nach Zeichen' : '', laAus.geltung ? laAus.geltung + ' nach Geltung' : '', laAus.ruht ? laAus.ruht + ' nicht in Kraft' : '', laAus.gw ? laAus.gw + ' nur Gegengleis' : ''].filter(Boolean);
-  $('lf-text').textContent = (laAus.n ? 'Ausgeblendet: ' + laAus.n + (laAus.n === 1 ? ' Eintrag' : ' Einträge') + ' (' + teileAus.join(', ') + '), Liste unten. ' : '') +
-    'Ein Zeichen trifft Einträge, die nur gewählte Zeichen tragen. Eine Geltung trifft Einträge, deren Angaben alle so eingeschränkt sind. „Nicht in Kraft“ trifft Einträge, die während der Fahrt nicht gelten. Einträge nur für das Gegengleis oder das durchgehende Hauptgleis der Gegenrichtung erscheinen mit der Taste GW. Die Wahl bleibt auf diesem Gerät gespeichert.';
+  var wg = $('la-weggruppe'), og = $('la-offengruppe'), ag = $('la-allegruppe'), xg = $('la-ausgruppe');
   if (!laDocs.length) { wg.hidden = true; og.hidden = true; ag.hidden = true; xg.hidden = true; return; }
   wg.hidden = false;
   if (!plan || !laZu) {
@@ -8093,12 +8123,12 @@ function fuelleLa() {
   var B = plan.bloecke[akt], lz = laZahl(), n = lz.ein, frag = laZu.eintraege.filter(function (t) { return !t.sicher && !t.aus; }).length;
   $('la-wegtitel').textContent = B.typ === 'regel' ? 'Auf dem Regelweg' : 'Im Alternativweg ' + B.name;
   $('la-wegtext').textContent = n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (frag ? ', davon ' + frag + ' mit Fragezeichen' : '') + '. ' +
-    (lz.off ? lz.off + ' nicht eingeordnet, siehe unten. ' : '') + (laAus.n ? laAus.n + ' ausgeblendet. ' : '') + 'Erfasst sind nur die geladenen La-Bereiche und darin nur La-Strecken, von denen eine Betriebsstelle im Fahrplan steht. Prüfe die Liste gegen deine La-Strecken.';
+    (lz.off ? lz.off + ' nicht eingeordnet, siehe unten. ' : '') + (laAus.n ? laAus.n + (laAus.n === 1 ? ' Eintrag gilt nur für das Gegengleis und erscheint' : ' Einträge gelten nur für das Gegengleis und erscheinen') + ' mit der Taste GW. ' : '') + 'Erfasst sind nur die geladenen La-Bereiche und darin nur La-Strecken, von denen eine Betriebsstelle im Fahrplan steht. Prüfe die Liste gegen deine La-Strecken.';
   $('la-strecken').innerHTML = laZu.strecken.map(function (x) {
     return '<li><span><b>' + esc(x.bereich + ' ' + x.nr) + '</b>' + (x.gesichert ? '' : ' ?') + ' · ' + esc(x.name.length > 90 ? x.name.slice(0, 88) + ' …' : x.name) + '</span><span class="num">' + x.anzahl + '</span></li>';
   }).join('');
   function knopf(o, k, art, zusatz) {
-    var e = o.e, T = e.teile[0];
+    var e = o.e, T = laSicht(e)[0] || e.teile[0];
     return '<button class="wahl" type="button" data-' + art + '="' + k + '"><b>La ' + esc(e.nr) + ' · ' + esc(laDocs[o.doc].bereich + ' ' + o.B.nr + o.B.ri) + '</b><span>' + esc(e.a + (e.b ? ' – ' + e.b : '')) + (T ? ' · ' + laTeil(T, true, false) : '') + '</span>' + (zusatz ? '<span>' + esc(zusatz) + '</span>' : '') + '</button>';
   }
   og.hidden = !lz.off;
@@ -8107,22 +8137,15 @@ function fuelleLa() {
   $('la-alletitel').textContent = 'Eingeordnete Einträge (' + n + '), in Fahrtrichtung';
   $('la-alle').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? '' : knopf(t, k, 'eintrag', t.sicher ? '' : t.hinweis); }).join('');
   xg.hidden = !laAus.n;
-  $('la-austitel').textContent = 'Ausgeblendet (' + laAus.n + ')';
-  var GRUND = { gw: 'nur Gegengleis, erscheint mit GW', zeichen: 'nach Zeichen ausgeblendet', geltung: 'nach Geltung ausgeblendet', ruht: 'nicht in Kraft' };
-  $('la-aus').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? knopf(t, k, 'eintrag', GRUND[t.grundAus]) : ''; }).join('') +
-    laZu.offen.map(function (o, k) { return o.aus ? knopf(o, k, 'offen', GRUND[o.grundAus] + ' · nicht eingeordnet') : ''; }).join('');
+  $('la-austitel').textContent = 'Nur Gegengleis, mit GW (' + laAus.n + ')';
+  $('la-aus').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? knopf(t, k, 'eintrag', '') : ''; }).join('') +
+    laZu.offen.map(function (o, k) { return o.aus ? knopf(o, k, 'offen', 'nicht eingeordnet') : ''; }).join('');
 }
 /* sichtbare eingeordnete und offene Einträge */
 function laZahl() {
   var ein = 0, off = 0;
   if (laZu) { laZu.eintraege.forEach(function (t) { if (!t.aus) ein++; }); laZu.offen.forEach(function (o) { if (!o.aus) off++; }); }
   return { ein: ein, off: off };
-}
-function setzeLaFilter(art, name) {
-  if (art === 'ruht') laFilter.ruht = !laFilter.ruht;
-  else if (laFilter[art][name]) delete laFilter[art][name]; else laFilter[art][name] = true;
-  try { localStorage.setItem(LAF_SPEICHER, JSON.stringify(laFilter)); } catch (e) {}
-  laGeaendert(); laMeldung(''); fuelleLa();
 }
 /* GW: Fahrt auf dem Gegengleis an oder aus */
 function setzeGw(an) {
@@ -8141,9 +8164,9 @@ function zeigeLaEintrag(t, zurueck) {
   dl.push(['Betriebsstelle', esc(e.a + (e.b ? ' – ' + e.b : ''))]);
   e.teile.forEach(function (T, k) {
     dl.push([e.teile.length > 1 ? 'Angabe ' + (k + 1) : 'Ort, Besonderheit', laTeil(T, false, false) || '–']);
-    if (T.geltung) dl.push(['Gilt für', esc(T.geltung)]);
-    var g = laGrund(T);
-    if (g) dl.push(['Gründe', esc(g)]);
+    if (T.geltung) dl.push(['Gilt für', laGeltHtml(T.geltung)]);
+    var g = laGrundHtml(T);
+    if (g) dl.push(['Gründe', g]);
   });
   dl.push(['In Kraft ab', esc(e.inKraft.text || '–')]);
   if (e.ausserKraft.text) dl.push(['Außer Kraft ab', esc(e.ausserKraft.text)]);
@@ -8360,7 +8383,7 @@ function laKurz() {
   if (!laDocs.length) return 'La ist nicht geladen und wird nicht angezeigt.';
   if (!laZu) return 'La geladen.';
   var lz = laZahl(), n = lz.ein, o = lz.off;
-  return 'La: ' + n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (o ? ', ' + o + ' nicht eingeordnet (Taste La)' : '') + (laAus.n ? ', ' + laAus.n + ' ausgeblendet' : '') + '.';
+  return 'La: ' + n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (o ? ', ' + o + ' nicht eingeordnet (Taste La)' : '') + (laAus.n ? ', ' + laAus.n + ' nur für das Gegengleis (Taste GW)' : '') + '.';
 }
 function planKennung() { return plan ? [plan.datei, plan.kopf.zug, plan.kopf.datumText, plan.bloecke[0].zeilen.length].join('|') : ''; }
 /* Gespeichert werden nur die La-Strecken, die den geladenen Fahrplan berühren */
@@ -8617,10 +8640,6 @@ $('m-zeit').addEventListener('click', function () { setzeModus('zeit'); });
 $('m-hand').addEventListener('click', function () { setzeModus('hand'); });
 $('m-ort').addEventListener('click', function () { setzeModus(modus === 'ort' ? (zeitMoeglich ? 'zeit' : 'hand') : 'ort'); });
 $('a-wach').addEventListener('click', function () { if (wachSoll) wachAus(); else wachAn(); });
-$('la-filtergruppe').addEventListener('click', function (ev) {
-  var b = ev.target.closest('[data-lfz],[data-lfg],#lf-ruht'); if (!b) return;
-  if (b.id === 'lf-ruht') setzeLaFilter('ruht'); else if (b.dataset.lfz != null) setzeLaFilter('zeichen', b.dataset.lfz); else setzeLaFilter('geltung', b.dataset.lfg);
-});
 $('t-gw').addEventListener('click', function () { setzeGw(!gw); });
 $('a-voll').addEventListener('click', schalteVoll);
 ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { zeigeVoll(''); if (plan) { messe(); tick(); } }); });
@@ -8662,11 +8681,8 @@ window.addEventListener('resize', function () { if (plan) { messe(); tick(); } }
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', zeigeAnzeige);
 
 try { var a = localStorage.getItem('fahrplananzeige.anzeige'); if (a === 'tag' || a === 'nacht') wurzel.dataset.anzeige = a; } catch (e) {}
-try {
-  var lf = JSON.parse(localStorage.getItem(LAF_SPEICHER) || 'null'), lfAlt = JSON.parse(localStorage.getItem('fahrplananzeige.lafilter') || 'null');
-  if (lf && typeof lf.zeichen === 'object' && typeof lf.geltung === 'object') laFilter = { zeichen: lf.zeichen || {}, geltung: lf.geltung || {}, ruht: lf.ruht === true };
-  else if (lfAlt && lfAlt.absturz === true) laFilter.zeichen.Absturzgefahr = true;
-} catch (e) {}
+/* frühere Fassungen hatten La-Filter: gespeicherte Wahl entfernen */
+try { localStorage.removeItem('fahrplananzeige.lafilter2'); localStorage.removeItem('fahrplananzeige.lafilter'); } catch (e) {}
 try { gw = sessionStorage.getItem(GW_SPEICHER) === '1'; } catch (e) {}
 $('t-gw').setAttribute('aria-pressed', String(gw));
 zeigeAnzeige();
