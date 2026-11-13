@@ -2,12 +2,12 @@
    Zwei Aufgaben:
    1. Die Anzeige selbst (und pdf.js, wenn es daneben liegt) offline bereithalten,
       damit sie im Führerraum ohne Netz startet und PDF lesen kann.
-   2. Eine PDF entgegennehmen, die von außen in die Anzeige geteilt wird
-      (share_target im Manifest). Sie wird kurz abgelegt, die Seite holt sie
-      sich beim Start und löscht sie sofort wieder.
+   2. Eine oder mehrere PDF entgegennehmen, die von außen in die Anzeige geteilt
+      werden (share_target im Manifest). Sie werden kurz abgelegt, die Seite holt
+      sie sich beim Start und löscht sie sofort wieder.
    Fahrplan-PDF werden nie dauerhaft zwischengespeichert. */
 
-var FASSUNG = 'fahrplan-schale-3';
+var FASSUNG = 'fahrplan-schale-4';
 var UEBERGABE = 'fahrplan-uebergabe';
 var SCHALE = ['./', './index.html', './manifest.webmanifest', './symbol/192.png', './symbol/512.png',
               './lib/pdf.min.js', './lib/pdf.worker.min.js'];
@@ -44,14 +44,16 @@ self.addEventListener('fetch', function (ev) {
   if (anfrage.method === 'POST' && /\/geteilt$/.test(url.pathname)) {
     ev.respondWith((function () {
       return anfrage.formData().then(function (form) {
-        var datei = form.get('datei') || form.get('file');
-        if (!datei || !datei.size) return null;
+        var dateien = form.getAll('datei').concat(form.getAll('file')).filter(function (d) { return d && d.size; });
+        if (!dateien.length) return null;
         return caches.open(UEBERGABE).then(function (c) {
-          return c.put(new Request(new URL('uebergabe', self.registration.scope).href),
-            new Response(datei, { headers: {
-              'content-type': 'application/pdf',
-              'x-datei-name': encodeURIComponent(datei.name || 'geteilt.pdf')
-            } }));
+          return Promise.all(dateien.map(function (datei, i) {
+            return c.put(new Request(new URL('uebergabe/' + i, self.registration.scope).href),
+              new Response(datei, { headers: {
+                'content-type': 'application/pdf',
+                'x-datei-name': encodeURIComponent(datei.name || 'geteilt.pdf')
+              } }));
+          }));
         });
       }).catch(function () { return null; }).then(function () {
         return Response.redirect(new URL('./?geteilt=1', self.registration.scope).href, 303);
@@ -63,7 +65,7 @@ self.addEventListener('fetch', function (ev) {
   if (anfrage.method !== 'GET' || url.origin !== self.location.origin) return;
 
   /* Tagesdaten nie aus dem Cache und nie hinein */
-  if (/\/(fahrplan\.json|pdf\/.*|uebergabe)$/.test(url.pathname)) return;
+  if (/\/uebergabe(\/\d+)?$/.test(url.pathname)) return;
 
   if (anfrage.mode === 'navigate') {
     /* aus dem Cache anzeigen, im Hintergrund erneuern: startet auch ohne Netz */

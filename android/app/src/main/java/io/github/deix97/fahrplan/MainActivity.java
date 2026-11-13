@@ -35,7 +35,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -59,10 +62,18 @@ public final class MainActivity extends Activity {
     private ValueCallback<Uri[]> dateiRueckruf;
     private GeolocationPermissions.Callback ortRueckruf;
     private String ortHerkunft;
-    private View vollbild;
-    private WebChromeClient.CustomViewCallback vollbildRueckruf;
-    private volatile byte[] geteilt;
-    private volatile String geteiltName;
+    /** übergebene PDF, die die Seite noch nicht abgeholt hat */
+    private final ArrayDeque<Geteilt> geteilt = new ArrayDeque<>();
+
+    private static final class Geteilt {
+        final String name;
+        final byte[] inhalt;
+
+        Geteilt(String name, byte[] inhalt) {
+            this.name = name;
+            this.inhalt = inhalt;
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -117,10 +128,6 @@ public final class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed() {
-        if (vollbild != null) {
-            chrome.onHideCustomView();
-            return;
-        }
         web.evaluateJavascript("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))", null);
     }
 
@@ -164,28 +171,38 @@ public final class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     private void nimm(Intent absicht) {
         if (absicht == null) return;
-        Uri quelle = null;
-        if (Intent.ACTION_SEND.equals(absicht.getAction())) {
-            quelle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        final List<Uri> quellen = new ArrayList<>();
+        String art = absicht.getAction();
+        if (Intent.ACTION_SEND.equals(art)) {
+            Uri u = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                     ? absicht.getParcelableExtra(Intent.EXTRA_STREAM, Uri.class)
                     : absicht.getParcelableExtra(Intent.EXTRA_STREAM);
-        } else if (Intent.ACTION_VIEW.equals(absicht.getAction())) {
-            quelle = absicht.getData();
+            if (u != null) quellen.add(u);
+        } else if (Intent.ACTION_SEND_MULTIPLE.equals(art)) {
+            ArrayList<Uri> mehrere = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ? absicht.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri.class)
+                    : absicht.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (mehrere != null) for (Uri u : mehrere) if (u != null) quellen.add(u);
+        } else if (Intent.ACTION_VIEW.equals(art) && absicht.getData() != null) {
+            quellen.add(absicht.getData());
         }
-        if (quelle == null) return;
-        final Uri u = quelle;
+        if (quellen.isEmpty()) return;
         new Thread(() -> {
-            try (InputStream ein = getContentResolver().openInputStream(u)) {
-                if (ein == null) return;
-                byte[] b = Eire.liesAlles(ein);
-                geteiltName = anzeigename(u);
-                geteilt = b;
-                runOnUiThread(() -> {
-                    if (web != null) web.evaluateJavascript("window.FahrplanNativGeteilt&&FahrplanNativGeteilt()", null);
-                });
-            } catch (IOException | SecurityException ignoriert) {
-                /* nicht lesbar: dann bleibt die Anzeige, wie sie ist */
+            List<Geteilt> gelesen = new ArrayList<>();
+            for (Uri u : quellen) {
+                try (InputStream ein = getContentResolver().openInputStream(u)) {
+                    if (ein != null) gelesen.add(new Geteilt(anzeigename(u), Eire.liesAlles(ein)));
+                } catch (IOException | SecurityException ignoriert) {
+                    /* nicht lesbar: diese eine überspringen */
+                }
             }
+            if (gelesen.isEmpty()) return;
+            synchronized (geteilt) {
+                geteilt.addAll(gelesen);
+            }
+            runOnUiThread(() -> {
+                if (web != null) web.evaluateJavascript("window.FahrplanNativGeteilt&&FahrplanNativGeteilt()", null);
+            });
         }, "geteilt").start();
     }
 
@@ -289,19 +306,20 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** je Aufruf die nächste übergebene PDF, 204 wenn keine mehr da ist */
     private WebResourceResponse geteiltAntwort() {
-        byte[] b = geteilt;
-        String name = geteiltName;
-        geteilt = null;
-        geteiltName = null;
-        if (b == null) return antwort(204, "application/pdf", new byte[0], null);
+        Geteilt g;
+        synchronized (geteilt) {
+            g = geteilt.pollFirst();
+        }
+        if (g == null) return antwort(204, "application/pdf", new byte[0], null);
         Map<String, String> kopf = new HashMap<>();
         try {
-            kopf.put("X-Dateiname", URLEncoder.encode(name == null ? "geteilt.pdf" : name, "UTF-8").replace("+", "%20"));
+            kopf.put("X-Dateiname", URLEncoder.encode(g.name == null ? "geteilt.pdf" : g.name, "UTF-8").replace("+", "%20"));
         } catch (java.io.UnsupportedEncodingException e) {
             kopf.put("X-Dateiname", "geteilt.pdf");
         }
-        return antwort(200, "application/pdf", b, kopf);
+        return antwort(200, "application/pdf", g.inhalt, kopf);
     }
 
     private final class Klient extends WebViewClient {
@@ -359,30 +377,6 @@ public final class MainActivity extends Activity {
             ortRueckruf = rueckruf;
             ortHerkunft = herkunft;
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, ANFRAGE_ORT);
-        }
-
-        @Override
-        public void onShowCustomView(View ansicht, CustomViewCallback rueckruf) {
-            if (vollbild != null) {
-                rueckruf.onCustomViewHidden();
-                return;
-            }
-            vollbild = ansicht;
-            vollbildRueckruf = rueckruf;
-            wurzel.addView(ansicht, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-            web.setVisibility(View.GONE);
-            immersiv();
-        }
-
-        @Override
-        public void onHideCustomView() {
-            if (vollbild == null) return;
-            wurzel.removeView(vollbild);
-            vollbild = null;
-            web.setVisibility(View.VISIBLE);
-            if (vollbildRueckruf != null) vollbildRueckruf.onCustomViewHidden();
-            vollbildRueckruf = null;
-            immersiv();
         }
     }
 

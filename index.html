@@ -447,10 +447,8 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
           <button class="knopf" type="button" id="a-tag" aria-pressed="false">Tag</button>
           <button class="knopf" type="button" id="a-nacht" aria-pressed="false">Nacht</button>
           <button class="knopf" type="button" id="a-wach" aria-pressed="false">Bildschirm anlassen</button>
-          <button class="knopf" type="button" id="a-voll" aria-pressed="false">Vollbild</button>
         </div>
         <p class="klar" id="a-wachtext" hidden></p>
-        <p class="klar" id="a-volltext" hidden></p>
       </div>
     </section>
   </div>
@@ -7885,6 +7883,10 @@ function richteEin() {
     if (E.v) lv = i;
     letzteV.push(lv);
   });
+  /* Eine Zeit vor der vorherigen (meist eine falsch gelesene, der Bericht nennt sie) macht die Zuordnung
+     Zeit → Zeile mehrdeutig; dann blieb ▼ in der Zeit-Automatik dahinter hängen. Solche Zeiten auf die
+     vorherige anheben, das Verteilen darunter macht sie wieder eindeutig. */
+  for (var k = 1; k < anker.length; k++) if (anker[k].t < anker[k - 1].t) anker[k].t = anker[k - 1].t;
   /* Mehrere Zeilen in derselben Minute: über die Minute verteilen, damit jede Zeile ihren Zeitpunkt hat
      und der Marker sie mit ▲ und ▼ erreicht */
   for (var a = 0; a < anker.length;) {
@@ -8363,24 +8365,7 @@ function istDunkel() {
   if (th) return th === 'dark';
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
-function zeigeAnzeige() { var dunkel = istDunkel(); $('a-tag').setAttribute('aria-pressed', String(!dunkel)); $('a-nacht').setAttribute('aria-pressed', String(dunkel)); zeigeVoll(''); }
-/* Vollbild: wo der Browser es anbietet; am iPhone geht es nur als Web-App vom Home-Bildschirm */
-function vollAn() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
-function alsApp() { return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
-function zeigeVoll(text) {
-  var d = document.documentElement, kann = !!(d.requestFullscreen || d.webkitRequestFullscreen), el = $('a-volltext');
-  $('a-voll').setAttribute('aria-pressed', String(vollAn()));
-  $('a-voll').hidden = alsApp();
-  if (!text && !alsApp() && !kann) text = 'Dieser Browser schaltet Seiten nicht ins Vollbild, so auch Safari am iPhone. Ohne Browserleisten läuft die Seite, wenn du sie in Safari über „Teilen“ zum Home-Bildschirm hinzufügst und von dort öffnest.';
-  el.hidden = !text; el.textContent = text || '';
-}
-function schalteVoll() {
-  var d = document.documentElement, an = d.requestFullscreen || d.webkitRequestFullscreen, aus = document.exitFullscreen || document.webkitExitFullscreen;
-  if (vollAn()) { if (aus) aus.call(document); return; }
-  if (!an) { zeigeVoll(''); return; }
-  try { var p = an.call(d); if (p && p.catch) p.catch(function () { zeigeVoll('Der Browser hat das Vollbild abgelehnt.'); }); }
-  catch (e) { zeigeVoll('Der Browser hat das Vollbild abgelehnt.'); }
-}
+function zeigeAnzeige() { var dunkel = istDunkel(); $('a-tag').setAttribute('aria-pressed', String(!dunkel)); $('a-nacht').setAttribute('aria-pressed', String(dunkel)); }
 function setzeAnzeige(neu) {
   wurzel.dataset.anzeige = neu;
   try { localStorage.setItem('fahrplananzeige.anzeige', neu); } catch (e) {}
@@ -8478,8 +8463,9 @@ function ladeDatei(datei) {
     return Blattfahrplan.lesePdf(pdfjsLib, new Uint8Array(buf), function (p, n) { meldung('Lese ' + datei.name + ' … Seite ' + p + ' von ' + n); });
   }).then(function (seiten) {
     var r = Blattfahrplan.parse(seiten);
-    if (r.fehler) { meldung(r.fehler); return; }
-    if (!r.regel.zeilen.length) { meldung('In der PDF wurde keine Fahrplanzeile gefunden.'); return; }
+    if (seiten.doc && (r.fehler || !r.regel.zeilen.length)) seiten.doc.destroy();
+    if (r.fehler) { meldung(r.fehler); return r.fehler; }
+    if (!r.regel.zeilen.length) { meldung('In der PDF wurde keine Fahrplanzeile gefunden.'); return 'In der PDF wurde keine Fahrplanzeile gefunden.'; }
     var p = planAusPdf(r, datei.name);
     /* aus dem Speicher geholte La-Auszüge gehören zum vorigen Fahrplan */
     laDocs = laDocs.filter(function (d) { return d.voll; });
@@ -8490,8 +8476,11 @@ function ladeDatei(datei) {
     var w = (p.warnungen || []).length;
     meldung('Fahrplan geladen. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' konnte ich nicht sicher zuordnen, siehe Liste unten. ' : '') + laKurz());
     zeigeBericht();
+    return true;
   }).catch(function (e) {
-    meldung(e && /Bibliothek/.test(e.message) ? e.message : 'Die Datei ließ sich nicht lesen. Erwartet wird ein Blattfahrplan als PDF aus der EBuLa-Rückfallebene.');
+    var t = e && /Bibliothek/.test(e.message) ? e.message : 'Die Datei ließ sich nicht lesen. Erwartet wird ein Blattfahrplan als PDF aus der EBuLa-Rückfallebene.';
+    meldung(t);
+    return t;
   });
 }
 
@@ -8556,16 +8545,81 @@ function ladeLa(dateien) {
     var text = neu.length ? neu.map(function (r) { return 'La-Bereich ' + r.bereich + ' gelesen'; }).join(', ') + '. ' + (!plan ? 'Eingeordnet wird, sobald ein Fahrplan geladen ist.' : laKurz()) : '';
     laMeldung((text + ' ' + fehler.join(' ')).trim());
     fuelleLa();
-  }).catch(function (e) { laMeldung(e && e.message ? e.message : 'Die Datei ließ sich nicht lesen.'); });
+    return neu.map(function (r) { return r.datei; });
+  }).catch(function (e) { laMeldung(e && e.message ? e.message : 'Die Datei ließ sich nicht lesen.'); return []; });
 }
 
 /* ---------- PDF ohne Dateiauswahl lesen ----------
    Meldungszeile für Teilen, Ordner, Installieren und EIRE; dazu eine PDF aus Bytes lesen,
    wie bei der Dateiauswahl (geteilte PDF, Abruf aus EIRE in der App). */
 function autoMeldung(text) { var el = $('auto-meldung'); if (!el) return; el.textContent = text || ''; el.hidden = !text; }
-function ladeBytes(name, bytes) {
+/* pdf.js übernimmt die Bytes, die es bekommt; darum liefert arrayBuffer() jedes Mal eine Kopie */
+function pdfAusBytes(name, bytes) {
   var buf = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-  return ladeDatei({ name: name || 'fahrplan.pdf', arrayBuffer: function () { return Promise.resolve(buf); } });
+  return { name: name || 'fahrplan.pdf', arrayBuffer: function () { return Promise.resolve(buf.slice(0)); } };
+}
+function ladeBytes(name, bytes) { return ladeDatei(pdfAusBytes(name, bytes)); }
+
+/* Art einer PDF nach Seite 1: Die Tages-La beginnt mit einem Deckblatt „La-Bereich …“, der Blattfahrplan
+   mit dem Tabellenkopf der Spalten 1 bis 5. fplo: Seite 1 nennt eine Fahrplananordnung. */
+function pdfArt(datei) {
+  return holePdfJs().then(function () { return datei.arrayBuffer(); }).then(function (buf) {
+    return pdfjsLib.getDocument({ data: new Uint8Array(buf), disableFontFace: true, verbosity: 0 }).promise;
+  }).then(function (doc) {
+    return doc.getPage(1).then(function (seite) { return seite.getTextContent(); }).then(function (inhalt) {
+      var stuecke = inhalt.items.map(function (i) { return String(i.str || '').trim(); }), text = stuecke.join(' ');
+      var tabelle = stuecke.indexOf('3a') >= 0 && stuecke.indexOf('3b') >= 0;
+      doc.destroy();
+      return { art: !tabelle && /La[-\u2010\u2011]\s*Bereich|Übersichtskarte/.test(text) ? 'la' : 'plan', fplo: /Fahrplananordnung|\bFplo\b/i.test(text) };
+    }, function (e) { doc.destroy(); throw e; });
+  })['catch'](function () { return { art: 'plan', fplo: false }; });
+}
+
+/* PDF ohne Angabe der Art (Teilen, „Öffnen mit“, PDF auswählen): Tages-La zum La-Leser, alles andere
+   zum Fahrplan-Leser. Die Fahrplan-Kandidaten werden der Reihe nach versucht, bis einer gelesen ist; es gilt
+   immer nur ein Fahrplan. Findet der Fahrplan-Leser keine Tabelle, wird die Datei noch als La versucht.
+   Hinweise zu den übrigen Dateien erscheinen in dem Blatt, das danach offen ist. */
+function ladeUnbekannt(dateien) {
+  dateien = Array.prototype.slice.call(dateien || []);
+  if (!dateien.length) return Promise.resolve();
+  var plaene = [], las = [], fplo = {}, alsLaVersucht = {}, notizen = [], planName = null, echteLa = 0;
+  return Promise.all(dateien.map(pdfArt)).then(function (arten) {
+    dateien.forEach(function (d, i) { if (arten[i].fplo) fplo[d.name] = true; (arten[i].art === 'la' ? las : plaene).push(d); });
+    echteLa = las.length;
+    var kette = Promise.resolve();
+    plaene.forEach(function (d) {
+      kette = kette.then(function () {
+        if (planName) { notizen.push('„' + d.name + '“ nicht geladen, es gilt immer nur ein Fahrplan.'); return; }
+        return ladeDatei(d).then(function (erg) {
+          if (erg === true) { planName = d.name; return; }
+          if (typeof erg !== 'string' || !erg) erg = 'Die Datei ließ sich nicht lesen.';
+          if (!/Keine Fahrplantabelle gefunden/.test(String(erg))) { notizen.push('„' + d.name + '“: ' + erg); return; }
+          if (fplo[d.name]) { meldung(''); notizen.push('„' + d.name + '“ ist eine Fahrplananordnung (Fplo). Die kann die Anzeige noch nicht lesen.'); return; }
+          alsLaVersucht[d.name] = true;
+          las.push(d);
+        });
+      });
+    });
+    return kette;
+  }).then(function () {
+    return (las.length ? ladeLa(las) : Promise.resolve([])).then(function (gelesen) {
+      las.forEach(function (d) {
+        if (!alsLaVersucht[d.name]) return;
+        if (gelesen.indexOf(d.name) >= 0) notizen.push('„' + d.name + '“ ist eine Tages-La und wurde als La geladen.');
+        else notizen.push('„' + d.name + '“ ist weder ein Blattfahrplan noch eine Tages-La.');
+      });
+      if (planName && gelesen.length) notizen.unshift('Dazu ' + (gelesen.length === 1 ? 'eine Tages-La' : gelesen.length + ' Tages-La') + ' gelesen, siehe Taste La.');
+      var text = notizen.join(' ');
+      /* mit Fahrplan zum Bericht; nur La: zum La-Blatt, dort steht, was gelesen wurde */
+      if (!planName && (echteLa || gelesen.length)) {
+        zeigeBlatt('t-la');
+        if (text) laMeldung(($('la-meldung').textContent + ' ' + text).trim());
+      } else {
+        zeigeBlatt('t-zug');
+        if (text) autoMeldung(text);
+      }
+    });
+  });
 }
 
 /* ---------- Als App installieren ----------
@@ -8601,20 +8655,23 @@ var ordnerGriff = null, ordnerZuletzt = '', ordnerLaeuft = false;
 
 function uebergabeHolen() {
   if (!window.caches) return Promise.resolve(false);
-  var schluessel;
-  try { schluessel = new URL('uebergabe', location.href).href; } catch (e) { return Promise.resolve(false); }
   /* has statt open: open legte auch ohne Übergabe einen leeren Speicher an */
   return caches.has(UEBERGABE_CACHE).then(function (da) { return da ? caches.open(UEBERGABE_CACHE) : null; }).then(function (c) {
     if (!c) return false;
-    return c.match(schluessel).then(function (antwort) {
-      if (!antwort) return false;
-      var name = 'geteilt.pdf';
-      try { name = decodeURIComponent(antwort.headers.get('x-datei-name') || '') || name; } catch (e) {}
-      return antwort.arrayBuffer().then(function (buf) {
-        return c['delete'](schluessel)['catch'](function () {}).then(function () {
-          zeigeBlatt('t-zug');
-          autoMeldung('Geteilte PDF übernommen: ' + name);
-          return ladeBytes(name, buf).then(function () { return true; });
+    return c.keys().then(function (anfragen) {
+      var teile = anfragen.filter(function (a) { return /\/uebergabe\/\d+$/.test(a.url); })
+        .sort(function (a, b) { return Number(a.url.split('/').pop()) - Number(b.url.split('/').pop()); });
+      if (!teile.length) return false;
+      return Promise.all(teile.map(function (a) {
+        return c.match(a).then(function (antwort) {
+          var name = 'geteilt.pdf';
+          try { name = decodeURIComponent(antwort.headers.get('x-datei-name') || '') || name; } catch (e) {}
+          return antwort.arrayBuffer().then(function (buf) { return pdfAusBytes(name, buf); });
+        });
+      })).then(function (dateien) {
+        return Promise.all(teile.map(function (a) { return c['delete'](a)['catch'](function () {}); })).then(function () {
+          autoMeldung('Geteilt: ' + dateien.map(function (d) { return d.name; }).join(', '));
+          return ladeUnbekannt(dateien).then(function () { return true; });
         });
       });
     });
@@ -8626,8 +8683,9 @@ function dateiHandhabe() {
     if (!window.launchQueue || !window.LaunchParams || !('files' in window.LaunchParams.prototype)) return;
     window.launchQueue.setConsumer(function (ruf) {
       if (!ruf || !ruf.files || !ruf.files.length) return;
-      ruf.files[0].getFile().then(function (f) {
-        zeigeBlatt('t-zug'); autoMeldung('Geöffnet: ' + f.name); return ladeDatei(f);
+      Promise.all(Array.prototype.map.call(ruf.files, function (h) { return h.getFile(); })).then(function (dateien) {
+        autoMeldung('Geöffnet: ' + dateien.map(function (f) { return f.name; }).join(', '));
+        return ladeUnbekannt(dateien);
       })['catch'](function () {});
     });
   } catch (e) {}
@@ -8851,19 +8909,27 @@ function eireLade(i) {
     ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen.'); })
     .then(function () { eireLaeuft = false; });
 }
-/* PDF, die der App über Teilen oder „Öffnen mit“ übergeben wurde */
+/* PDF, die der App über Teilen oder „Öffnen mit“ übergeben wurden; die App reicht sie einzeln heraus */
+var nativKette = Promise.resolve();
 function nativGeteilt() {
   if (!NATIV) return Promise.resolve(false);
-  return fetch('geteilt', { cache: 'no-store' }).then(function (a) {
-    if (a.status !== 200) return false;
-    var name = a.headers.get('X-Dateiname') || 'geteilt.pdf';
-    try { name = decodeURIComponent(name); } catch (e) {}
-    return a.arrayBuffer().then(function (buf) {
-      zeigeBlatt('t-zug');
-      autoMeldung('Übernommen: ' + name);
-      return ladeBytes(name, buf);
-    }).then(function () { return true; });
+  nativKette = nativKette.then(function () {
+    var dateien = [];
+    function naechste() {
+      return fetch('geteilt', { cache: 'no-store' }).then(function (a) {
+        if (a.status !== 200) return;
+        var name = a.headers.get('X-Dateiname') || 'geteilt.pdf';
+        try { name = decodeURIComponent(name); } catch (e) {}
+        return a.arrayBuffer().then(function (buf) { dateien.push(pdfAusBytes(name, buf)); if (dateien.length < 30) return naechste(); });
+      });
+    }
+    return naechste().then(function () {
+      if (!dateien.length) return false;
+      autoMeldung('Übernommen: ' + dateien.map(function (d) { return d.name; }).join(', '));
+      return ladeUnbekannt(dateien).then(function () { return true; });
+    });
   })['catch'](function () { return false; });
+  return nativKette;
 }
 window.FahrplanNativGeteilt = nativGeteilt;
 
@@ -9066,13 +9132,11 @@ $('m-hand').addEventListener('click', function () { setzeModus('hand'); });
 $('m-ort').addEventListener('click', function () { setzeModus(modus === 'ort' ? (zeitMoeglich ? 'zeit' : 'hand') : 'ort'); });
 $('a-wach').addEventListener('click', function () { if (wachSoll) wachAus(); else wachAn(); });
 $('t-gw').addEventListener('click', function () { setzeGw(!gw); });
-$('a-voll').addEventListener('click', schalteVoll);
-['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { zeigeVoll(''); if (plan) { messe(); tick(); } }); });
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && wachSoll && !wachSperre) wachAn(); });
 $('v-minus').addEventListener('click', function () { aendereVersp(-60000); });
 $('v-plus').addEventListener('click', function () { aendereVersp(60000); });
 $('v-null').addEventListener('click', function () { if (modus !== 'zeit') return; if (pause) pauseTe = jetzt(); else verspMs = 0; tick(); });
-$('datei').addEventListener('change', function () { var f = this.files && this.files[0]; if (f) ladeDatei(f); this.value = ''; });
+$('datei').addEventListener('change', function () { var f = this.files && this.files[0]; if (f) ladeUnbekannt([f]); this.value = ''; });
 $('sitzung-weg').addEventListener('click', loescheSitzung);
 $('leer-laden').addEventListener('click', function () { zeigeBlatt('t-zug'); zeigeBericht(); });
 $('la-datei').addEventListener('change', function () { if (this.files && this.files.length) ladeLa(this.files); this.value = ''; });

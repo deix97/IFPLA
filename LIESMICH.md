@@ -35,7 +35,13 @@ Signaturschlüssel liegt offen im Repo (`android/fahrplan.keystore`), damit jede
 Unterschrift trägt. Deshalb: **Updates nur von der Release-Seite dieses Repos installieren.**
 
 Außerdem in der App: Teilen und „Öffnen mit“ für PDF, Dateiauswahl für Fahrplan und La, Ortung,
-Bildschirm wach, Vollbild. Die Zurück-Geste schließt nur Blätter, nie die Anzeige.
+Bildschirm wach. Die App läuft immer im Vollbild; die Zurück-Geste schließt nur Blätter, nie die Anzeige.
+
+**PDF teilen, z. B. aus DiLoc:** Die Anzeige erkennt an Seite 1, was ankommt. Eine Tages-La (Deckblatt
+„La-Bereich …“) geht an den La-Leser, alles andere an den Fahrplan-Leser; findet der keine Tabelle,
+versucht sie es noch als La. Mehrere PDF auf einmal gehen auch, etwa mehrere La-Bereiche und ein
+Fahrplan; es gilt immer nur ein Fahrplan. Fahrplananordnungen (Fplo) erkennt sie und sagt das, lesen
+kann sie sie noch nicht. Dasselbe gilt für „PDF auswählen“ und „Öffnen mit“, auch im Browser.
 
 **Wie sie mit EIRE spricht** — genau wie die EIRE-Webseite selbst:
 `POST /ui-api/authentication/login` (Benutzername, Passwort, bei Bedarf Einmalkennwort) liefert
