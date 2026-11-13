@@ -6,6 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Fahrplan">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#dfe3de">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c1012">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="symbol/192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="symbol/192.png">
 <title>Fahrplananzeige Führerraum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -207,6 +212,9 @@ button{font:inherit;color:inherit}
 .wertgross{font-family:var(--font-display);font-weight:700;font-size:1.3rem;min-width:5rem;text-align:center}
 .klar{font-size:.86rem;color:var(--ink-soft);max-width:65ch;margin:0}
 .meldung{border-left:.3rem solid var(--la);background:var(--la-bg);color:var(--la-ink);padding:.4rem .6rem;font-size:.9rem;max-width:65ch}
+.feld{min-height:44px;flex:1 1 17rem;min-width:8rem;padding:.3rem .5rem;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--ink);font:inherit}
+.ankreuz{display:inline-flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-height:44px;font-size:.86rem;color:var(--ink-soft)}
+.ankreuz input[type=checkbox]{width:1.15rem;height:1.15rem;accent-color:var(--marker)}
 .meldung[hidden]{display:none}
 .liste{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.15rem}
 .liste li{display:flex;justify-content:space-between;gap:1rem;border-top:1px solid var(--line-soft);padding:.2rem 0}
@@ -269,6 +277,11 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
 
     <section class="blatt" id="blatt-zug" role="dialog" aria-labelledby="h-zug" hidden>
       <div class="blattkopf"><h2 id="h-zug">Fahrplan laden</h2><button class="knopf" type="button" data-zu="t-zug">Schließen</button></div>
+      <div class="gruppe" id="installieren" hidden>
+        <span class="gl">Als App auf diesem Gerät</span>
+        <div class="reihe"><button class="knopf" type="button" id="installieren-knopf">Als App installieren</button></div>
+        <p class="klar">Danach startet die Anzeige vom Startbildschirm, auch ohne Netz, und steht im Teilen-Menü: PDF in EIRE öffnen, teilen, Fahrplan wählen.</p>
+      </div>
       <div class="gruppe">
         <span class="gl">Blattfahrplan aus der EBuLa-Rückfallebene</span>
         <div class="reihe">
@@ -277,6 +290,27 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         </div>
         <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden die zweispaltige und die einspaltige Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
       </div>
+      <div class="gruppe">
+        <span class="gl">Automatisch holen</span>
+        <div class="reihe">
+          <input class="feld" type="url" id="auto-quelle" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://localhost:8723/fahrplan.json" aria-label="Quelle für den automatischen Abruf">
+          <button class="knopf" type="button" id="auto-hol">Jetzt holen</button>
+        </div>
+        <div class="reihe">
+          <label class="ankreuz"><input type="checkbox" id="auto-an"> Beim Start holen</label>
+        </div>
+        <p class="klar">Die Quelle ist ein JSON-Verzeichnis <code>{"stand":"&hellip;","plan":"&hellip;.pdf","la":["&hellip;.pdf"]}</code> oder direkt eine PDF; relative Pfade gelten gegen die Quelle. Abgerufen wird vom Browser dieses Geräts, gelesen wird wie bei der Dateiauswahl. Fahrplan und La gehen auch so nur in den Speicher dieses Tabs. Per Adresse: <code>?plan=&hellip;</code>, <code>?la=&hellip;,&hellip;</code>, <code>?quelle=&hellip;&amp;auto=1</code>.</p>
+      </div>
+      <div class="gruppe" id="auto-geraet">
+        <span class="gl">Vom Gerät übernehmen</span>
+        <div class="reihe" id="auto-ordnerreihe" hidden>
+          <button class="knopf" type="button" id="auto-ordner">Ordner wählen</button>
+          <button class="knopf" type="button" id="auto-ordner-weg" hidden>Ordner vergessen</button>
+          <span class="klar" id="auto-ordnername"></span>
+        </div>
+        <p class="klar" id="auto-geraet-text">Teilen: die Anzeige einmal zum Startbildschirm hinzufügen, dann steht sie im Teilen-Menü. PDF im Portal öffnen, teilen, Fahrplananzeige wählen — sie liest sie sofort. Ordner: den Ordner wählen, in den die PDF geladen werden; die Anzeige nimmt beim Start und beim Zurückwechseln die jüngste PDF daraus. Dateien, deren Name mit „la“ beginnt, bleiben dabei liegen.</p>
+      </div>
+      <div class="meldung" id="auto-meldung" role="status" hidden></div>
       <div class="meldung" id="lade-meldung" role="status" hidden></div>
       <div class="gruppe" id="bericht" hidden>
         <span class="gl">Gelesen</span>
@@ -8385,21 +8419,42 @@ function ladeSkript(src) {
   return new Promise(function (ok, fehler) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { s.remove(); fehler(new Error(src)); }; document.head.appendChild(s); });
 }
 var pdfBereit = null;
-/* pdf.js 3.11.174 von cdnjs; das Worker-Skript läuft im Hauptfaden, damit kein eigener Worker nötig ist */
+var PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+var PDFJS_SPEICHER = 'fahrplananzeige.pdfjs';
+/* pdf.js 3.11.174, das Worker-Skript läuft im Hauptfaden, damit kein eigener Worker nötig ist.
+   Reihenfolge der Herkunft: ?pdfjs=… oder window.PDFJS_BASIS (wird gemerkt), dann lib/ neben
+   der Anzeige, zuletzt cdnjs. Mit lib/ liest die Anzeige PDF ohne Internet. */
+function pdfQuellen() {
+  var b = '', liste = [];
+  try { b = new URLSearchParams(location.search).get('pdfjs') || ''; } catch (e) {}
+  if (b) { try { localStorage.setItem(PDFJS_SPEICHER, b); } catch (e) {} }
+  if (!b && window.PDFJS_BASIS) b = String(window.PDFJS_BASIS);
+  if (!b) { try { b = localStorage.getItem(PDFJS_SPEICHER) || ''; } catch (e) {} }
+  [b, 'lib/', PDFJS_CDN].forEach(function (x) {
+    if (!x) return;
+    if (x.charAt(x.length - 1) !== '/') x += '/';
+    if (liste.indexOf(x) < 0) liste.push(x);
+  });
+  return liste;
+}
+function ladePdfVon(basis) {
+  return ladeSkript(basis + 'pdf.min.js').then(function () { return ladeSkript(basis + 'pdf.worker.min.js'); })
+    .then(function () { if (!window.pdfjsLib) throw new Error('pdfjsLib fehlt'); pdfjsLib.GlobalWorkerOptions.workerSrc = basis + 'pdf.worker.min.js'; });
+}
 function holePdfJs() {
   if (window.pdfjsLib && window.pdfjsWorker) return Promise.resolve();
   if (!pdfBereit) {
-    var cdn = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
-    pdfBereit = ladeSkript(cdn + 'pdf.min.js').then(function () { return ladeSkript(cdn + 'pdf.worker.min.js'); })
-      .then(function () { if (!window.pdfjsLib) throw new Error('pdfjsLib fehlt'); pdfjsLib.GlobalWorkerOptions.workerSrc = cdn + 'pdf.worker.min.js'; })
-      .catch(function () { pdfBereit = null; throw new Error('Die PDF-Bibliothek ließ sich nicht laden. Prüfe die Verbindung und versuche es erneut.'); });
+    pdfBereit = pdfQuellen().reduce(function (kette, basis) {
+      return kette['catch'](function () { return ladePdfVon(basis); });
+    }, Promise.reject(new Error('noch keine Quelle')))
+      ['catch'](function () { pdfBereit = null; throw new Error('Die PDF-Bibliothek ließ sich nicht laden. Prüfe die Verbindung und versuche es erneut.'); });
   }
   return pdfBereit;
 }
 function ladeDatei(datei) {
   meldung('Lese ' + datei.name + ' …');
   $('bericht').hidden = true; $('pruefen').hidden = true;
-  holePdfJs().then(function () { return datei.arrayBuffer(); }).then(function (buf) {
+  return holePdfJs().then(function () { return datei.arrayBuffer(); }).then(function (buf) {
     return Blattfahrplan.lesePdf(pdfjsLib, new Uint8Array(buf), function (p, n) { meldung('Lese ' + datei.name + ' … Seite ' + p + ' von ' + n); });
   }).then(function (seiten) {
     var r = Blattfahrplan.parse(seiten);
@@ -8471,7 +8526,7 @@ function ladeLa(dateien) {
       fehler.push(datei.name + ': ließ sich nicht lesen.');
     });
   });
-  kette.then(function () {
+  return kette.then(function () {
     neu.forEach(function (r) {
       laDocs = laDocs.filter(function (d) { if (d.bereich !== r.bereich) return true; if (d.pdf) d.pdf.destroy(); return false; });
       laDocs.push(r);
@@ -8482,6 +8537,275 @@ function ladeLa(dateien) {
     laMeldung((text + ' ' + fehler.join(' ')).trim());
     fuelleLa();
   }).catch(function (e) { laMeldung(e && e.message ? e.message : 'Die Datei ließ sich nicht lesen.'); });
+}
+
+/* ---------- Automatik: Fahrplan und La ohne Dateiauswahl holen ----------
+   Quelle ist ein JSON-Verzeichnis
+     { "stand": "2026-11-13T03:40:00Z", "plan": "fahrplan.pdf", "la": ["la-nord.pdf"] }
+   oder direkt eine PDF. Relative Pfade gelten gegen die Quelle. Geholt wird vom
+   Browser dieses Geräts, gelesen wird mit demselben Weg wie bei der Dateiauswahl. */
+var AUTO_SPEICHER = 'fahrplananzeige.auto';
+var autoKonf = { quelle: '', an: false };
+var autoStand = '', autoLaeuft = false;
+
+function autoLies() {
+  try {
+    var k = JSON.parse(localStorage.getItem(AUTO_SPEICHER) || 'null');
+    if (k && typeof k === 'object') {
+      if (typeof k.quelle === 'string') autoKonf.quelle = k.quelle;
+      autoKonf.an = !!k.an;
+    }
+  } catch (e) {}
+}
+function autoSchreibe() { try { localStorage.setItem(AUTO_SPEICHER, JSON.stringify(autoKonf)); } catch (e) {} }
+function autoMeldung(text) { var el = $('auto-meldung'); if (!el) return; el.textContent = text || ''; el.hidden = !text; }
+function autoFelder() {
+  var q = $('auto-quelle'), a = $('auto-an');
+  if (q) q.value = autoKonf.quelle;
+  if (a) a.checked = autoKonf.an;
+}
+function autoName(url) {
+  var n = String(url).split('#')[0].split('?')[0].split('/').pop() || 'abruf.pdf';
+  try { n = decodeURIComponent(n); } catch (e) {}
+  return n;
+}
+function autoGegen(url) { return new URL(String(url), new URL(autoKonf.quelle || '.', location.href).href).href; }
+function autoFehlerText(e) {
+  var t = e && e.message ? e.message : 'unbekannter Fehler';
+  if (location.protocol === 'file:') t += ' Aus einer lokalen Datei (file://) darf der Browser nichts abrufen: die Seite über http://localhost öffnen.';
+  else if (/Failed to fetch|NetworkError|Load failed/i.test(t)) t += ' Erreichbarkeit, CORS und Zertifikat der Quelle prüfen.';
+  return t;
+}
+/* Blattfahrplan.lesePdf und TagesLa.lesePdf brauchen von einer Datei nur Name und arrayBuffer */
+function autoPdf(url) {
+  return fetch(url, { cache: 'no-store', credentials: 'same-origin' }).then(function (antwort) {
+    if (!antwort.ok) throw new Error('HTTP ' + antwort.status + ' bei ' + autoName(url));
+    return antwort.arrayBuffer();
+  }).then(function (buf) {
+    if (!buf || buf.byteLength < 5) throw new Error(autoName(url) + ' ist leer.');
+    return { name: autoName(url), arrayBuffer: function () { return Promise.resolve(buf); } };
+  });
+}
+function autoVerzeichnis(quelle) {
+  if (/\.pdf($|[?#])/i.test(quelle)) return Promise.resolve({ plan: quelle, la: [] });
+  return fetch(quelle, { cache: 'no-store', credentials: 'same-origin' }).then(function (antwort) {
+    if (!antwort.ok) throw new Error('HTTP ' + antwort.status + ' bei der Quelle.');
+    return antwort.json();
+  }).then(function (m) {
+    if (!m || typeof m !== 'object') throw new Error('Die Quelle liefert kein JSON-Verzeichnis.');
+    return m;
+  });
+}
+/* holt Fahrplan und La aus dem Verzeichnis; stumm = Abruf ohne Zutun */
+function autoNimm(m, stumm) {
+  var stand = m.stand == null ? '' : String(m.stand);
+  if (stand && stand === autoStand && plan) { autoMeldung('Unverändert, Stand ' + stand + '.'); return Promise.resolve(false); }
+  var planUrl = m.plan ? autoGegen(m.plan) : '';
+  var laRoh = m.la == null ? [] : (Array.isArray(m.la) ? m.la : [m.la]);
+  var laUrls = laRoh.filter(Boolean).map(autoGegen);
+  if (!planUrl && !laUrls.length) throw new Error('Das Verzeichnis nennt weder Fahrplan noch La.');
+  var kette = Promise.resolve();
+  if (planUrl) kette = kette.then(function () { return autoPdf(planUrl); }).then(function (d) { return ladeDatei(d); });
+  if (laUrls.length) kette = kette.then(function () {
+    return Promise.all(laUrls.map(function (u) { return autoPdf(u); }));
+  }).then(function (ds) { return ladeLa(ds); });
+  return kette.then(function () {
+    var okPlan = !planUrl || !!(plan && plan.datei === autoName(planUrl));
+    var okLa = !laUrls.length || laDocs.length > 0;
+    autoStand = okPlan && okLa ? stand : '';
+    if (okPlan && okLa) {
+      autoMeldung('Geholt und gelesen: ' + [planUrl ? 'Fahrplan' : '', laUrls.length ? laUrls.length + (laUrls.length === 1 ? ' La-Bereich' : ' La-Bereiche') : ''].filter(Boolean).join(', ') + (stand ? ', Stand ' + stand : '') + '.');
+      if (stumm && plan) zeigeBlatt(null);
+    } else {
+      autoMeldung('Geholt, aber ' + (!okPlan ? 'der Fahrplan' : 'die La') + ' ließ sich nicht lesen. Die Meldung dazu steht ' + (!okPlan ? 'oben' : 'im Blatt La') + '.');
+    }
+    return okPlan && okLa;
+  });
+}
+function autoHole(stumm) {
+  if (autoLaeuft) return Promise.resolve(false);
+  var quelle = (autoKonf.quelle || '').trim();
+  if (!quelle) { if (!stumm) autoMeldung('Keine Quelle eingetragen.'); return Promise.resolve(false); }
+  autoLaeuft = true;
+  autoMeldung('Rufe ab …');
+  return autoVerzeichnis(quelle).then(function (m) { return autoNimm(m, stumm); })
+    .catch(function (e) { autoMeldung('Abruf fehlgeschlagen: ' + autoFehlerText(e)); return false; })
+    .then(function (ok) { autoLaeuft = false; return ok; });
+}
+function autoSetze(quelle, an) {
+  if (quelle != null) autoKonf.quelle = String(quelle).trim();
+  if (an != null) autoKonf.an = !!an;
+  autoSchreibe(); autoFelder();
+}
+/* Steuerbar von außen, z. B. aus einem Kiosk-Rahmen oder einem Skript:
+   Automatik.plan(url), Automatik.la([url, ...]), Automatik.hole(), Automatik.setze({...}) */
+window.Automatik = {
+  hole: function () { return autoHole(false); },
+  plan: function (url) { return autoPdf(autoGegen(url)).then(function (d) { return ladeDatei(d); }); },
+  la: function (urls) {
+    var liste = Array.isArray(urls) ? urls : [urls];
+    return Promise.all(liste.map(function (u) { return autoPdf(autoGegen(u)); })).then(function (ds) { return ladeLa(ds); });
+  },
+  bytes: function (name, bytes, istLa) {
+    var buf = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    var d = { name: name || 'abruf.pdf', arrayBuffer: function () { return Promise.resolve(buf); } };
+    return istLa ? ladeLa([d]) : ladeDatei(d);
+  },
+  verzeichnis: function (m) { return Promise.resolve().then(function () { return autoNimm(m || {}, false); }); },
+  setze: function (k) { k = k || {}; autoSetze(k.quelle, k.an); return { quelle: autoKonf.quelle, an: autoKonf.an }; },
+  stand: function () { return { quelle: autoKonf.quelle, an: autoKonf.an, stand: autoStand, plan: !!plan, la: laDocs.length }; }
+};
+
+/* ---------- Als App installieren ----------
+   Chrome und Edge melden mit beforeinstallprompt, dass die Anzeige installierbar ist.
+   Das Angebot wird aufgehoben und über einen eigenen Knopf im Blatt "Fahrplan laden" gezeigt. */
+var installAngebot = null;
+window.addEventListener('beforeinstallprompt', function (ev) {
+  ev.preventDefault();
+  installAngebot = ev;
+  var g = $('installieren'); if (g) g.hidden = false;
+});
+window.addEventListener('appinstalled', function () {
+  installAngebot = null;
+  var g = $('installieren'); if (g) g.hidden = true;
+  autoMeldung('Als App installiert. Ab jetzt vom Startbildschirm starten; im Teilen-Menü heißt sie „Fahrplan“.');
+});
+function installiere() {
+  var a = installAngebot; if (!a) return;
+  installAngebot = null;
+  $('installieren').hidden = true;
+  try { a.prompt(); } catch (e) { return; }
+  if (a.userChoice) a.userChoice.then(function (w) {
+    if (w && w.outcome !== 'accepted') autoMeldung('Nicht installiert. Später geht es über das Browsermenü: ⋮ → App installieren.');
+  })['catch'](function () {});
+}
+
+/* ---------- Übernahme vom Gerät: geteilte PDF, geöffnete Datei, Download-Ordner ----------
+   Der Dienstarbeiter (sw.js) legt eine geteilte PDF kurz ab, hier wird sie geholt und
+   sofort gelöscht. Der Ordner wird nur gelesen, sein Griff liegt in IndexedDB. */
+var UEBERGABE_CACHE = 'fahrplan-uebergabe';
+var ORDNER_SPEICHER = 'fahrplananzeige.ordner';
+var ordnerGriff = null, ordnerZuletzt = '', ordnerLaeuft = false;
+
+function uebergabeHolen() {
+  if (!window.caches) return Promise.resolve(false);
+  var schluessel;
+  try { schluessel = new URL('uebergabe', location.href).href; } catch (e) { return Promise.resolve(false); }
+  /* has statt open: open legte auch ohne Übergabe einen leeren Speicher an */
+  return caches.has(UEBERGABE_CACHE).then(function (da) { return da ? caches.open(UEBERGABE_CACHE) : null; }).then(function (c) {
+    if (!c) return false;
+    return c.match(schluessel).then(function (antwort) {
+      if (!antwort) return false;
+      var name = 'geteilt.pdf';
+      try { name = decodeURIComponent(antwort.headers.get('x-datei-name') || '') || name; } catch (e) {}
+      return antwort.arrayBuffer().then(function (buf) {
+        return c['delete'](schluessel)['catch'](function () {}).then(function () {
+          zeigeBlatt('t-zug');
+          autoMeldung('Geteilte PDF übernommen: ' + name);
+          return ladeDatei({ name: name, arrayBuffer: function () { return Promise.resolve(buf); } }).then(function () { return true; });
+        });
+      });
+    });
+  })['catch'](function () { return false; });
+}
+/* "Öffnen mit" aus der Dateiliste des Geräts */
+function dateiHandhabe() {
+  try {
+    if (!window.launchQueue || !window.LaunchParams || !('files' in window.LaunchParams.prototype)) return;
+    window.launchQueue.setConsumer(function (ruf) {
+      if (!ruf || !ruf.files || !ruf.files.length) return;
+      ruf.files[0].getFile().then(function (f) {
+        zeigeBlatt('t-zug'); autoMeldung('Geöffnet: ' + f.name); return ladeDatei(f);
+      })['catch'](function () {});
+    });
+  } catch (e) {}
+}
+function griffDb() {
+  return new Promise(function (ok, fehler) {
+    if (!window.indexedDB) { fehler(new Error('kein IndexedDB')); return; }
+    var a = indexedDB.open('fahrplananzeige', 1);
+    a.onupgradeneeded = function () { a.result.createObjectStore('griffe'); };
+    a.onsuccess = function () { ok(a.result); };
+    a.onerror = function () { fehler(a.error); };
+  });
+}
+function griffLegen(wert) {
+  return griffDb().then(function (db) {
+    return new Promise(function (ok, fehler) {
+      var t = db.transaction('griffe', 'readwrite'), l = t.objectStore('griffe');
+      if (wert) l.put(wert, 'ordner'); else l['delete']('ordner');
+      t.oncomplete = function () { db.close(); ok(); };
+      t.onerror = function () { db.close(); fehler(t.error); };
+    });
+  })['catch'](function () {});
+}
+function griffHolen() {
+  return griffDb().then(function (db) {
+    return new Promise(function (ok) {
+      var a = db.transaction('griffe', 'readonly').objectStore('griffe').get('ordner');
+      a.onsuccess = function () { db.close(); ok(a.result || null); };
+      a.onerror = function () { db.close(); ok(null); };
+    });
+  })['catch'](function () { return null; });
+}
+function ordnerZeige() {
+  var r = $('auto-ordnerreihe'), n = $('auto-ordnername'), w = $('auto-ordner-weg');
+  if (r) r.hidden = !window.showDirectoryPicker;
+  if (n) n.textContent = ordnerGriff ? 'Gewählt: ' + ordnerGriff.name : '';
+  if (w) w.hidden = !ordnerGriff;
+}
+function ordnerMerke(kennung) {
+  ordnerZuletzt = kennung;
+  try { sessionStorage.setItem(ORDNER_SPEICHER, kennung); } catch (e) {}
+}
+function ordnerWaehlen() {
+  if (!window.showDirectoryPicker) { autoMeldung('Dieser Browser kann keinen Ordner lesen. Dann der Weg über Teilen.'); return; }
+  window.showDirectoryPicker({ id: 'fahrplan', mode: 'read', startIn: 'downloads' }).then(function (g) {
+    ordnerGriff = g; ordnerMerke('');
+    return griffLegen(g).then(function () { ordnerZeige(); return ordnerSchau(false); });
+  })['catch'](function (e) {
+    if (e && e.name === 'AbortError') return;
+    autoMeldung('Der Ordner ließ sich nicht öffnen: ' + ((e && e.message) || 'unbekannter Fehler'));
+  });
+}
+function ordnerVergessen() {
+  ordnerGriff = null; ordnerMerke('');
+  griffLegen(null).then(function () { ordnerZeige(); autoMeldung('Der Ordner wird nicht mehr gelesen.'); });
+}
+function ordnerRecht(fragen) {
+  if (!ordnerGriff || !ordnerGriff.queryPermission) return Promise.resolve(true);
+  return ordnerGriff.queryPermission({ mode: 'read' }).then(function (z) {
+    if (z === 'granted') return true;
+    if (!fragen || !ordnerGriff.requestPermission) return false;
+    return ordnerGriff.requestPermission({ mode: 'read' }).then(function (z2) { return z2 === 'granted'; });
+  })['catch'](function () { return false; });
+}
+/* jüngste PDF im Ordner nehmen; Namen, die mit "la" beginnen, sind keine Blattfahrpläne */
+function ordnerSchau(stumm) {
+  if (!ordnerGriff || ordnerLaeuft) return Promise.resolve(false);
+  ordnerLaeuft = true;
+  return ordnerRecht(!stumm).then(function (darf) {
+    if (!darf) { if (!stumm) autoMeldung('Für den Ordner fehlt die Erlaubnis. Noch einmal „Ordner wählen“.'); return false; }
+    var neueste = null, lauf = ordnerGriff.values();
+    var weiter = function () {
+      return lauf.next().then(function (schritt) {
+        if (schritt.done) return;
+        var e = schritt.value;
+        if (e.kind !== 'file' || !/\.pdf$/i.test(e.name) || /^la/i.test(e.name)) return weiter();
+        return e.getFile().then(function (f) {
+          if (!neueste || f.lastModified > neueste.lastModified) neueste = f;
+        })['catch'](function () {}).then(weiter);
+      });
+    };
+    return weiter().then(function () {
+      if (!neueste) { if (!stumm) autoMeldung('Im Ordner liegt keine Fahrplan-PDF.'); return false; }
+      var kennung = neueste.name + '|' + neueste.lastModified + '|' + neueste.size;
+      if (kennung === ordnerZuletzt) { if (!stumm) autoMeldung('Die jüngste PDF im Ordner ist schon geladen: ' + neueste.name); return false; }
+      ordnerMerke(kennung);
+      autoMeldung('Aus dem Ordner: ' + neueste.name);
+      return ladeDatei(neueste).then(function () { return true; });
+    });
+  })['catch'](function () { return false; }).then(function (x) { ordnerLaeuft = false; return x; });
 }
 
 /* ---------- Ortung ---------- */
@@ -8694,6 +9018,16 @@ $('sitzung-weg').addEventListener('click', loescheSitzung);
 $('leer-laden').addEventListener('click', function () { zeigeBlatt('t-zug'); zeigeBericht(); });
 $('la-datei').addEventListener('change', function () { if (this.files && this.files.length) ladeLa(this.files); this.value = ''; });
 $('la-weg').addEventListener('click', entferneLa);
+$('auto-hol').addEventListener('click', function () { autoSetze($('auto-quelle').value, null); autoHole(false); });
+$('auto-quelle').addEventListener('change', function () { autoSetze(this.value, null); });
+$('auto-quelle').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); autoSetze(this.value, null); autoHole(false); } });
+$('auto-an').addEventListener('change', function () { autoSetze($('auto-quelle').value, this.checked); autoMeldung(this.checked ? 'Die Quelle wird beim Start abgefragt.' : 'Die Quelle wird beim Start nicht abgefragt.'); });
+$('auto-ordner').addEventListener('click', ordnerWaehlen);
+$('installieren-knopf').addEventListener('click', installiere);
+$('auto-ordner-weg').addEventListener('click', ordnerVergessen);
+/* kein Takt: der Ordner wird angesehen, sobald die Anzeige wieder vorn ist */
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && ordnerGriff) ordnerSchau(true); });
+window.addEventListener('focus', function () { if (ordnerGriff) ordnerSchau(true); });
 $('blatt-la').addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-offen],[data-eintrag]'); if (!b || !laZu) return;
   var o = b.dataset.offen != null ? laZu.offen[Number(b.dataset.offen)] : laZu.eintraege[Number(b.dataset.eintrag)];
@@ -8737,6 +9071,38 @@ zeigeAnzeige();
   else { zeigeLeer(); tick(); zeigeBlatt('t-zug'); }
 })();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (plan) { messe(); tick(); } });
+/* Automatik: gespeicherte Quelle, dazu Adressteile ?quelle= ?plan= ?la= ?auto= */
+(function () {
+  autoLies();
+  var P = null;
+  try { P = new URLSearchParams(location.search); } catch (e) { P = null; }
+  var q = P && P.get('quelle'), an = P && P.get('auto');
+  if (q != null || an != null) autoSetze(q, an == null ? null : (an !== '0' && an !== 'aus' && an !== 'false'));
+  else autoFelder();
+  dateiHandhabe();
+  try { ordnerZuletzt = sessionStorage.getItem(ORDNER_SPEICHER) || ''; } catch (e) {}
+  var ordnerBereit = griffHolen().then(function (g) { ordnerGriff = g || null; ordnerZeige(); });
+  var pUrl = P && P.get('plan'), laUrl = P && P.get('la');
+  uebergabeHolen().then(function (kam) {
+    if (kam) return;
+    if (pUrl || laUrl) {
+      zeigeBlatt('t-zug');
+      return autoNimm({ plan: pUrl || '', la: laUrl ? String(laUrl).split(',').filter(Boolean) : [] }, true)
+        .catch(function (e) { autoMeldung('Abruf fehlgeschlagen: ' + autoFehlerText(e)); });
+    }
+    if (autoKonf.an && (autoKonf.quelle || '').trim() && !plan) autoHole(true);
+    return ordnerBereit.then(function () { if (ordnerGriff) return ordnerSchau(true); });
+  });
+})();
+
+/* Dienstarbeiter: Anzeige offline bereit und Empfang geteilter PDF */
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  if (!(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) return;
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js', { scope: './' })['catch'](function () {});
+  });
+})();
 setInterval(tick, 250);
 </script>
 </body>
