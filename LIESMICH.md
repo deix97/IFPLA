@@ -23,6 +23,18 @@ Soll gar nichts mehr angetippt werden, braucht es einen zweiten Rechner, der sic
 und die PDF in einen Ordner legt (`werkzeug/quelle.mjs` liefert sie dann an die Anzeige). Der
 Anmeldeteil ist nicht gebaut.
 
+## Ein Dienst auf dem Tablet
+
+1. In Chrome `https://eire.noncd.db.de` öffnen und anmelden (nicht im Inkognito-Fenster, sonst
+   merkt Chrome weder Anmeldung noch Passwort).
+2. Zugnummer und Datum eingeben → *Fahrpläne anzeigen* → beim passenden Fahrplan auf das
+   Download-Symbol tippen.
+3. Die heruntergeladene **Datei** teilen: Downloads öffnen (oder in der Meldung von Chrome auf
+   *Öffnen*), PDF lange drücken bzw. Teilen-Symbol → **Fahrplan**.
+
+Die Anzeige öffnet sich und liest den Fahrplan. Teilt man stattdessen die geöffnete Seite, kommt
+nur ein Link an; die Anzeige sagt das dann und nennt den richtigen Weg.
+
 ## Auf dem Android-Tablet installieren
 
 1. In Chrome `https://deix97.github.io/IFPLA/` öffnen.

@@ -9083,8 +9083,19 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(function (
   try { ordnerZuletzt = sessionStorage.getItem(ORDNER_SPEICHER) || ''; } catch (e) {}
   var ordnerBereit = griffHolen().then(function (g) { ordnerGriff = g || null; ordnerZeige(); });
   var pUrl = P && P.get('plan'), laUrl = P && P.get('la');
+  var geteilt = !!(P && P.get('geteilt') != null);
   uebergabeHolen().then(function (kam) {
+    /* ?geteilt=1 aus der Adresse nehmen, damit Neuladen nichts wiederholt */
+    if (geteilt) {
+      try { var u = new URL(location.href); u.searchParams['delete']('geteilt'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) {}
+    }
     if (kam) return;
+    if (geteilt) {
+      /* Chrome teilt aus einer geöffneten PDF-Seite nur den Link, nicht die Datei */
+      zeigeBlatt('t-zug');
+      autoMeldung('Beim Teilen kam keine PDF an, nur ein Link. Die heruntergeladene Datei teilen: Downloads öffnen, PDF lange drücken, Teilen → Fahrplan.');
+      return;
+    }
     if (pUrl || laUrl) {
       zeigeBlatt('t-zug');
       return autoNimm({ plan: pUrl || '', la: laUrl ? String(laUrl).split(',').filter(Boolean) : [] }, true)
