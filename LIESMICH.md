@@ -13,7 +13,9 @@ nicht (CORS), eine App schon.
 
 1. `https://github.com/deix97/IFPLA/releases/latest/download/fahrplan.apk` in Chrome öffnen.
 2. Die heruntergeladene `fahrplan.apk` öffnen. Android fragt einmal, ob Chrome Apps installieren
-   darf — erlauben, dann *Installieren*.
+   darf — erlauben, dann *Installieren*. Warnt Play Protect vor einer unbekannten App, über
+   *Details* → *Trotzdem installieren* weiter; die App kommt nicht aus dem Play Store.
+   Nötig ist mindestens Android 8.
 3. „Fahrplan“ starten, unter **Zugang zu EIRE** Benutzername und Passwort eintragen, *Speichern*.
 
 **Bei jedem Dienst:** Zugnummer eingeben (Datum steht auf heute), *Fahrpläne suchen*, den

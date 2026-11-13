@@ -30,6 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Gradle 8.14 läuft nur bis Java 24; der Runner bringt inzwischen Java 25 mit
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Prüfen und bauen
         run: ./gradlew --no-daemon testDebugUnitTest assembleRelease lintRelease
 
