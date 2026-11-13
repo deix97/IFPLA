@@ -23,12 +23,21 @@ Soll gar nichts mehr angetippt werden, braucht es einen zweiten Rechner, der sic
 und die PDF in einen Ordner legt (`werkzeug/quelle.mjs` liefert sie dann an die Anzeige). Der
 Anmeldeteil ist nicht gebaut.
 
-## Anzeige installieren
+## Auf dem Android-Tablet installieren
 
-Nötig für Teilen und „Öffnen mit“: die Anzeige über **https** aufrufen (GitHub Pages reicht), dann
-im Browsermenü *Zum Startbildschirm hinzufügen* bzw. *Installieren*. Dafür liegen
-`manifest.webmanifest`, `sw.js` und `symbol/` neben der `index.html`; aus einer lokalen Datei
-(`file://`) geht beides nicht.
+1. In Chrome `https://deix97.github.io/IFPLA/` öffnen.
+2. Oben im Blatt *Fahrplan laden* auf **Als App installieren** tippen, bestätigen.
+
+Fertig: „Fahrplan“ liegt auf dem Startbildschirm, startet ohne Netz und steht im Teilen-Menü.
+Zeigt die Anzeige den Knopf nicht, ist sie schon installiert — oder es geht über das Browsermenü
+⋮ → *App installieren*.
+
+Am Rechner geht es genauso (Chrome/Edge, Knopf oder Install-Symbol in der Adressleiste). Auf
+iPhone/iPad gibt es nur *Teilen → Zum Home-Bildschirm*, ohne Teilen-Ziel und ohne Datei-Öffnen.
+
+Voraussetzung ist **https**, wie bei GitHub Pages; aus einer lokalen Datei (`file://`) lässt sich
+nichts installieren. GitHub Pages liefert den Zweig aus, der unter *Settings → Pages* eingestellt
+ist — Änderungen erscheinen dort erst, wenn sie auf diesem Zweig liegen.
 
 ## Download-Ordner beobachten
 
@@ -61,7 +70,7 @@ Relative Pfade gelten gegen die Quelle. Ändert sich `stand` nicht, wird nichts 
 | `?auto=1` | beim Start holen (`?auto=0` aus) |
 | `?plan=…` | einmalig diese Fahrplan-PDF holen |
 | `?la=…,…` | einmalig diese La-PDF holen |
-| `?pdfjs=/lib/` | pdf.js aus eigener Ablage statt von cdnjs |
+| `?pdfjs=…` | pdf.js aus anderer Ablage als `lib/` |
 
 Aus einem Skript oder Kiosk-Rahmen:
 
@@ -87,23 +96,14 @@ Dann `http://127.0.0.1:8723/?quelle=/fahrplan.json&auto=1` öffnen. Neue PDF in 
 die Anzeige holt sie beim nächsten Öffnen oder mit `Jetzt holen`. Einteilung nach Dateiname: beginnt er mit `la`, gilt die
 Datei als Tages-La (je Bereich — Nord, Ost, Mitte, Südost, Süd — die jüngste), sonst als
 Blattfahrplan (die jüngste). Eigenes Verzeichnis: `--verzeichnis ./fahrplan.json`.
-Weitere Schalter: `--port`, `--app`, `--lib`, `--cors`.
+Weitere Schalter: `--port`, `--app`, `--lib` (sonst `lib/` im Projekt), `--cors`.
 
 ## Ohne Internet
 
-Zwei Dinge holte die Anzeige bisher aus dem Netz: sich selbst und pdf.js von cdnjs. Im Führerraum
-ist beides oft nicht erreichbar.
-
-* `sw.js` legt Anzeige, Symbole und — falls vorhanden — pdf.js ab, sobald die Anzeige einmal über
-  https (oder localhost) geladen wurde. Danach startet sie ohne Netz.
-* pdf.js dazulegen:
-
-```bash
-npm pack pdfjs-dist@3.11.174 && tar -xzf pdfjs-dist-3.11.174.tgz
-mkdir -p lib && cp package/build/pdf.min.js package/build/pdf.worker.min.js lib/
-```
-
-  Einmal mit `?pdfjs=/lib/` öffnen; die Herkunft wird gemerkt, bei Fehlschlag gilt wieder cdnjs.
+pdf.js 3.11.174 liegt unter `lib/` (Mozilla, Apache-2.0, Lizenz daneben) und wird von dort
+geladen; cdnjs ist nur noch Rückfall. `sw.js` legt Anzeige, Symbole und pdf.js beim ersten Aufruf
+über https ab. Danach startet und liest die Anzeige ohne Netz. Eine andere Herkunft für pdf.js
+lässt sich mit `?pdfjs=…` setzen; sie wird gemerkt.
 
 ## Was wo liegt
 
@@ -113,6 +113,7 @@ mkdir -p lib && cp package/build/pdf.min.js package/build/pdf.worker.min.js lib/
 | `manifest.webmanifest` | Name, Symbole, Teilen-Ziel, Datei-Öffnen |
 | `sw.js` | Ablage für den Betrieb ohne Netz, Annahme geteilter PDF |
 | `symbol/` | Symbole der installierten Anzeige |
+| `lib/` | pdf.js 3.11.174 samt Lizenz |
 | `werkzeug/quelle.mjs` | kleiner Server für PDF-Ordner und Verzeichnis |
 
 Fahrplan-PDF werden nirgends dauerhaft abgelegt: eine geteilte PDF liegt bis zum Start der Anzeige

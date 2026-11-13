@@ -7,7 +7,7 @@
       sich beim Start und löscht sie sofort wieder.
    Fahrplan-PDF werden nie dauerhaft zwischengespeichert. */
 
-var FASSUNG = 'fahrplan-schale-2';
+var FASSUNG = 'fahrplan-schale-3';
 var UEBERGABE = 'fahrplan-uebergabe';
 var SCHALE = ['./', './index.html', './manifest.webmanifest', './symbol/192.png', './symbol/512.png',
               './lib/pdf.min.js', './lib/pdf.worker.min.js'];

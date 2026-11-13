@@ -6,9 +6,8 @@
                  [--lib ./lib] [--cors]
    Dann im Browser http://127.0.0.1:8723/?quelle=/fahrplan.json&auto=1
 
-   Liegen in --lib die Dateien pdf.min.js und pdf.worker.min.js (npm pack pdfjs-dist@3.11.174,
-   aus package/build/), liefert die Quelle sie unter /lib/ aus; mit &pdfjs=/lib/ in der Adresse
-   liest die Anzeige PDF dann ohne Internet.
+   pdf.js liegt im Projekt unter lib/; die Quelle liefert es unter /lib/ aus, und die Anzeige
+   nimmt es von dort ohne weiteren Parameter. Mit --lib lässt sich ein anderer Ordner angeben.
 
    Einteilung der PDF im Ordner, nach Name:
      beginnt mit "la"  -> Tages-La; je La-Bereich im Namen (Nord, Ost, Mitte, Suedost, Sued)
@@ -149,7 +148,7 @@ try { await stat(join(libOrdner, 'pdf.min.js')); await stat(join(libOrdner, 'pdf
 
 server.listen(port, '127.0.0.1', () => {
   console.log('Quelle läuft.  Ordner: ' + ordner);
-  console.log('pdf.js:         ' + (eigenesPdfJs ? 'eigene Ablage ' + libOrdner : 'cdnjs, also mit Internet; sonst --lib füllen'));
-  console.log('Anzeige:        http://127.0.0.1:' + port + '/?quelle=/fahrplan.json&auto=1' + (eigenesPdfJs ? '&pdfjs=/lib/' : ''));
+  console.log('pdf.js:         ' + (eigenesPdfJs ? libOrdner : 'nicht gefunden, die Anzeige nimmt cdnjs (braucht Internet)'));
+  console.log('Anzeige:        http://127.0.0.1:' + port + '/?quelle=/fahrplan.json&auto=1');
   console.log('Verzeichnis:    http://127.0.0.1:' + port + '/fahrplan.json');
 });
