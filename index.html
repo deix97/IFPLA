@@ -215,6 +215,9 @@ button{font:inherit;color:inherit}
 .feld{min-height:44px;flex:1 1 17rem;min-width:8rem;padding:.3rem .5rem;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--ink);font:inherit}
 .ankreuz{display:inline-flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-height:44px;font-size:.86rem;color:var(--ink-soft)}
 .ankreuz input[type=checkbox]{width:1.15rem;height:1.15rem;accent-color:var(--marker)}
+.feld.eng{flex:0 1 10.5rem}
+.aufklapp summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-family:var(--font-display);font-weight:600}
+.aufklapp[open] summary{margin-bottom:.3rem}
 .meldung[hidden]{display:none}
 .liste{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.15rem}
 .liste li{display:flex;justify-content:space-between;gap:1rem;border-top:1px solid var(--line-soft);padding:.2rem 0}
@@ -277,6 +280,36 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
 
     <section class="blatt" id="blatt-zug" role="dialog" aria-labelledby="h-zug" hidden>
       <div class="blattkopf"><h2 id="h-zug">Fahrplan laden</h2><button class="knopf" type="button" data-zu="t-zug">Schließen</button></div>
+      <div class="gruppe" id="eire" hidden>
+        <span class="gl">Aus EIRE holen</span>
+        <div class="reihe">
+          <input class="feld eng" type="text" id="eire-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer">
+          <input class="feld eng" type="date" id="eire-datum" aria-label="Datum">
+          <select class="feld eng" id="eire-ansicht" aria-label="PDF-Ansicht"><option value="1">zweispaltig</option><option value="0">einspaltig</option></select>
+          <button class="knopf" type="button" id="eire-suche">Fahrpläne suchen</button>
+        </div>
+        <div class="reihe" id="eire-codereihe" hidden>
+          <input class="feld eng" type="text" id="eire-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="Einmalkennwort" aria-label="Einmalkennwort aus der Authentifizierungs-App">
+          <button class="knopf" type="button" id="eire-code-ok">Mit Code anmelden</button>
+        </div>
+        <div class="meldung" id="eire-meldung" role="status" hidden></div>
+        <div class="gruppe" id="eire-ergebnis" hidden></div>
+        <details class="aufklapp" id="eire-zugang">
+          <summary>Zugang zu EIRE</summary>
+          <div class="gruppe">
+            <div class="reihe">
+              <input class="feld" type="text" id="eire-benutzer" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Benutzername" aria-label="Benutzername für EIRE">
+              <input class="feld" type="password" id="eire-passwort" autocomplete="current-password" placeholder="Passwort" aria-label="Passwort für EIRE">
+            </div>
+            <div class="reihe">
+              <button class="knopf" type="button" id="eire-zugang-ok">Speichern</button>
+              <button class="knopf" type="button" id="eire-zugang-weg" hidden>Zugang löschen</button>
+              <span class="klar" id="eire-zugang-stand"></span>
+            </div>
+            <p class="klar">Benutzername und Passwort liegen verschlüsselt im Schlüsselspeicher dieses Tablets und gehen nur an eire.noncd.db.de. Welcher Fahrplan gilt, wählst du selbst aus der Liste. <span id="eire-fassung"></span></p>
+          </div>
+        </details>
+      </div>
       <div class="gruppe" id="installieren" hidden>
         <span class="gl">Als App auf diesem Gerät</span>
         <div class="reihe"><button class="knopf" type="button" id="installieren-knopf">Als App installieren</button></div>
@@ -290,7 +323,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         </div>
         <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden die zweispaltige und die einspaltige Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
       </div>
-      <div class="gruppe">
+      <div class="gruppe" id="auto-gruppe">
         <span class="gl">Automatisch holen</span>
         <div class="reihe">
           <input class="feld" type="url" id="auto-quelle" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://localhost:8723/fahrplan.json" aria-label="Quelle für den automatischen Abruf">
@@ -8808,6 +8841,153 @@ function ordnerSchau(stumm) {
   })['catch'](function () { return false; }).then(function (x) { ordnerLaeuft = false; return x; });
 }
 
+/* ---------- EIRE: nur in der Android-App ----------
+   Die App beantwortet eire/suche und eire/pdf selbst und spricht dafür mit EIRE; eine
+   Webseite im Browser darf das nicht. Ohne window.FahrplanNativ bleibt alles verborgen. */
+var NATIV = !!window.FahrplanNativ;
+var EIRE_ANSICHT = 'fahrplananzeige.eire.ansicht';
+var eireTreffer = [], eireDatumGesucht = '', eireLaeuft = false;
+/* Bildschirm wach: der WebView kann es nicht verlässlich, die App schon */
+if (NATIV) {
+  try {
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: function () {
+      FahrplanNativ.wach(true);
+      var hoerer = [], sperre = { released: false, type: 'screen',
+        release: function () {
+          if (!sperre.released) { sperre.released = true; FahrplanNativ.wach(false); hoerer.forEach(function (f) { try { f(); } catch (e) {} }); }
+          return Promise.resolve();
+        },
+        addEventListener: function (art, f) { if (art === 'release') hoerer.push(f); } };
+      return Promise.resolve(sperre);
+    } } });
+  } catch (e) {}
+}
+function eireMeldung(text) { var el = $('eire-meldung'); if (!el) return; el.textContent = text || ''; el.hidden = !text; }
+function zweistellig(n) { return (n < 10 ? '0' : '') + n; }
+function heuteIso() { var d = new Date(); return d.getFullYear() + '-' + zweistellig(d.getMonth() + 1) + '-' + zweistellig(d.getDate()); }
+function datumDeutsch(iso) { var t = String(iso).split('-'); return t.length === 3 ? t[2] + '.' + t[1] + '.' + t[0] : String(iso); }
+function eireZugangZeige() {
+  var z = {};
+  try { z = JSON.parse(FahrplanNativ.zugang()) || {}; } catch (e) { z = {}; }
+  $('eire-zugang-stand').textContent = z.gesetzt ? 'Gespeichert für ' + z.benutzer + '.' : 'Noch kein Zugang gespeichert.';
+  $('eire-zugang-weg').hidden = !z.gesetzt;
+  if (!z.gesetzt) $('eire-zugang').open = true;
+  return !!z.gesetzt;
+}
+function eireZugangSpeichern() {
+  var b = $('eire-benutzer').value.trim(), p = $('eire-passwort').value, r = 'fehler';
+  if (!b || !p) { eireMeldung('Benutzername und Passwort eintragen.'); return; }
+  try { r = FahrplanNativ.setzeZugang(b, p); } catch (e) {}
+  $('eire-passwort').value = '';
+  if (r === 'ok') { eireZugangZeige(); $('eire-zugang').open = false; eireMeldung('Zugang gespeichert. Jetzt Zugnummer eingeben.'); $('eire-zug').focus(); }
+  else eireMeldung('Der Zugang ließ sich nicht speichern.');
+}
+function eireZugangLoeschen() {
+  try { FahrplanNativ.vergissZugang(); } catch (e) {}
+  eireZugangZeige();
+  eireMeldung('Zugang gelöscht.');
+}
+function eireFehler(f, status) {
+  var art = (f && f.art) || '';
+  $('eire-codereihe').hidden = art !== 'code';
+  if (art === 'code') { $('eire-code').value = ''; $('eire-code').focus(); }
+  if (art === 'zugang' || art === 'anmeldung' || art === 'passwort-abgelaufen') {
+    $('eire-zugang').open = true;
+    if (art !== 'passwort-abgelaufen') $('eire-benutzer').focus();
+  }
+  eireMeldung((f && f.text) || ('EIRE hat mit Fehler ' + status + ' geantwortet.'));
+}
+function eireJson(antwort) {
+  return antwort.json().then(function (j) { return { status: antwort.status, daten: j }; }, function () { return { status: antwort.status, daten: null }; });
+}
+function eireSuche(code) {
+  if (eireLaeuft) return;
+  var zug = $('eire-zug').value.trim(), datum = $('eire-datum').value || heuteIso();
+  if (!/^(0|[1-9][0-9]{0,11})$/.test(zug)) { eireMeldung('Zugnummer: nur Ziffern, ohne führende Null.'); $('eire-zug').focus(); return; }
+  try { localStorage.setItem(EIRE_ANSICHT, $('eire-ansicht').value); } catch (e) {}
+  eireLaeuft = true; $('eire-suche').disabled = true;
+  $('eire-ergebnis').hidden = true; $('eire-ergebnis').innerHTML = '';
+  eireMeldung('Frage EIRE nach Zug ' + zug + ' am ' + datumDeutsch(datum) + ' \u2026');
+  fetch('eire/suche?zug=' + encodeURIComponent(zug) + '&datum=' + encodeURIComponent(datum) + (code ? '&code=' + encodeURIComponent(code) : ''), { cache: 'no-store' })
+    .then(eireJson)
+    .then(function (r) {
+      if (r.status === 200 && Array.isArray(r.daten)) { eireZeige(r.daten, zug, datum); return; }
+      eireFehler(r.daten, r.status);
+    })
+    ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen.'); })
+    .then(function () { eireLaeuft = false; $('eire-suche').disabled = false; });
+}
+/* sortiert wie EIRE: Gültigkeitsbeginn, dann -ende, dann Anfangsbahnhof */
+function eireTag(s) {
+  var t = String(s || '').trim().split('.');
+  if (t.length !== 3) return 0;
+  var j = Number(t[2]); if (j < 100) j += 2000;
+  return j * 10000 + Number(t[1]) * 100 + Number(t[0]);
+}
+function eireZeige(liste, zug, datum) {
+  $('eire-codereihe').hidden = true;
+  eireDatumGesucht = datum;
+  eireTreffer = liste.slice().sort(function (a, b) {
+    return (eireTag(a.validityStart) - eireTag(b.validityStart)) || (eireTag(a.validityEnd) - eireTag(b.validityEnd))
+      || String(a.origin || '').localeCompare(String(b.origin || ''), 'de');
+  });
+  if (!eireTreffer.length) { eireMeldung('Für Zug ' + zug + ' am ' + datumDeutsch(datum) + ' hat EIRE keinen Fahrplan.'); return; }
+  function zeile(t, i, text) {
+    return '<button class="wahl" type="button" data-eire="' + i + '"><b>' + esc(t.trainNumber || zug) + ' \u00b7 ' + esc(t.origin || '?') + ' \u2192 ' + esc(t.destination || '?')
+      + '</b><span>' + esc(text || '') + '</span></button>';
+  }
+  /* wie die beiden Reiter in EIRE */
+  var gesamt = [], einzel = [];
+  eireTreffer.forEach(function (t, i) {
+    if (t.type === 'G' || t.type === 'A') gesamt.push(zeile(t, i, t.travelPathValidityPeriod));
+    if (t.type !== 'G') einzel.push(zeile(t, i, t.travelPath || t.travelPathValidityPeriod));
+  });
+  $('eire-ergebnis').innerHTML = (gesamt.length ? '<span class="gl">Gesamtblattfahrpläne</span>' + gesamt.join('') : '')
+    + (einzel.length ? '<span class="gl">Einzelblattfahrpläne</span>' + einzel.join('') : '');
+  $('eire-ergebnis').hidden = false;
+  eireMeldung(eireTreffer.length === 1 ? 'Ein Fahrplan gefunden. Antippen zum Laden.' : eireTreffer.length + ' Fahrpläne gefunden. Den passenden antippen.');
+}
+function eireLade(i) {
+  var t = eireTreffer[i];
+  if (!t || eireLaeuft) return;
+  eireLaeuft = true;
+  eireMeldung('Lade ' + (t.trainNumber || 'Fahrplan') + ' \u2026');
+  fetch('eire/pdf?id=' + encodeURIComponent(t.id) + '&datum=' + encodeURIComponent(eireDatumGesucht) + '&zweispaltig=' + encodeURIComponent($('eire-ansicht').value), { cache: 'no-store' })
+    .then(function (a) {
+      if (!a.ok) return eireJson(a).then(function (r) { eireFehler(r.daten, r.status); });
+      var name = a.headers.get('X-Dateiname') || ('EIRE_' + (t.trainNumber || '') + '.pdf');
+      try { name = decodeURIComponent(name); } catch (e) {}
+      return a.arrayBuffer().then(function (buf) { return Automatik.bytes(name, buf); }).then(function () {
+        if (plan && plan.datei === name) {
+          var w = (plan.warnungen || []).length;
+          eireMeldung('Geladen: ' + (t.trainNumber || '') + ', ' + (t.origin || '') + ' \u2192 ' + (t.destination || '') + '.'
+            + (w ? ' Bitte die Liste unten mit der PDF vergleichen.' : ''));
+          /* ohne unsichere Stellen gleich zur Anzeige, sonst bleibt der Bericht offen */
+          if (!w) zeigeBlatt(null);
+        } else {
+          eireMeldung('EIRE hat eine PDF geliefert, sie ließ sich aber nicht lesen. Die Meldung dazu steht unten.');
+        }
+      });
+    })
+    ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen.'); })
+    .then(function () { eireLaeuft = false; });
+}
+/* PDF, die der App über Teilen oder „Öffnen mit“ übergeben wurde */
+function nativGeteilt() {
+  if (!NATIV) return Promise.resolve(false);
+  return fetch('geteilt', { cache: 'no-store' }).then(function (a) {
+    if (a.status !== 200) return false;
+    var name = a.headers.get('X-Dateiname') || 'geteilt.pdf';
+    try { name = decodeURIComponent(name); } catch (e) {}
+    return a.arrayBuffer().then(function (buf) {
+      zeigeBlatt('t-zug');
+      autoMeldung('Übernommen: ' + name);
+      return Automatik.bytes(name, buf);
+    }).then(function () { return true; });
+  })['catch'](function () { return false; });
+}
+window.FahrplanNativGeteilt = nativGeteilt;
+
 /* ---------- Ortung ---------- */
 function ortVerzeichnis() {
   if (ortDaten === null) { var el = $('orte-daten'); ortDaten = window.Ort && el ? Ort.leseOrte(el.textContent) : false; }
@@ -9024,6 +9204,17 @@ $('auto-quelle').addEventListener('keydown', function (ev) { if (ev.key === 'Ent
 $('auto-an').addEventListener('change', function () { autoSetze($('auto-quelle').value, this.checked); autoMeldung(this.checked ? 'Die Quelle wird beim Start abgefragt.' : 'Die Quelle wird beim Start nicht abgefragt.'); });
 $('auto-ordner').addEventListener('click', ordnerWaehlen);
 $('installieren-knopf').addEventListener('click', installiere);
+if (NATIV) {
+  $('eire-suche').addEventListener('click', function () { eireSuche(''); });
+  $('eire-zug').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); eireSuche(''); } });
+  $('eire-code-ok').addEventListener('click', function () { var c = $('eire-code').value.trim(); if (c) eireSuche(c); else $('eire-code').focus(); });
+  $('eire-code').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); $('eire-code-ok').click(); } });
+  $('eire-zugang-ok').addEventListener('click', eireZugangSpeichern);
+  $('eire-passwort').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); eireZugangSpeichern(); } });
+  $('eire-zugang-weg').addEventListener('click', eireZugangLoeschen);
+  $('eire-ansicht').addEventListener('change', function () { try { localStorage.setItem(EIRE_ANSICHT, this.value); } catch (e) {} });
+  $('eire-ergebnis').addEventListener('click', function (ev) { var b = ev.target.closest('[data-eire]'); if (b) eireLade(Number(b.dataset.eire)); });
+}
 $('auto-ordner-weg').addEventListener('click', ordnerVergessen);
 /* kein Takt: der Ordner wird angesehen, sobald die Anzeige wieder vorn ist */
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && ordnerGriff) ordnerSchau(true); });
@@ -9106,9 +9297,21 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(function (
   });
 })();
 
-/* Dienstarbeiter: Anzeige offline bereit und Empfang geteilter PDF */
+/* In der Android-App: EIRE-Abschnitt zeigen, was nur im Browser Sinn hat, verbergen */
 (function () {
-  if (!('serviceWorker' in navigator)) return;
+  if (!NATIV) return;
+  $('eire').hidden = false;
+  ['auto-gruppe', 'auto-geraet', 'installieren'].forEach(function (id) { var el = $(id); if (el) el.hidden = true; });
+  $('eire-datum').value = heuteIso();
+  try { var ansicht = localStorage.getItem(EIRE_ANSICHT); if (ansicht === '0' || ansicht === '1') $('eire-ansicht').value = ansicht; } catch (e) {}
+  try { $('eire-fassung').textContent = 'App-Fassung ' + FahrplanNativ.version() + '.'; } catch (e) {}
+  eireZugangZeige();
+  nativGeteilt();
+})();
+
+/* Dienstarbeiter: Anzeige offline bereit und Empfang geteilter PDF; in der App nicht nötig */
+(function () {
+  if (NATIV || !('serviceWorker' in navigator)) return;
   if (!(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) return;
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js', { scope: './' })['catch'](function () {});

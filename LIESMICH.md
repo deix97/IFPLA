@@ -1,16 +1,50 @@
 # Fahrplan ohne Dateiauswahl
 
-Die Anzeige konnte den Blattfahrplan bisher nur über „PDF auswählen“ aufnehmen. Dazu kommen jetzt
-vier Wege, die ohne Dateiauswahl auskommen, dazu Betrieb ohne Internet.
+Die Anzeige konnte den Blattfahrplan bisher nur über „PDF auswählen“ aufnehmen. Jetzt gibt es eine
+Android-App, die ihn selbst aus EIRE holt, dazu mehrere Wege ohne Dateiauswahl im Browser und
+Betrieb ohne Internet.
 
-## Was mit EIRE geht und was nicht
+## Android-App: nur Zugnummer und Datum
 
-**Nicht möglich:** `https://eire.noncd.db.de` direkt aus der Anzeige heraus abrufen. Das ist eine
-fremde Herkunft mit Anmeldung über Cookie; der Browser lässt ein Skript einer anderen Seite dort
-weder anmelden noch lesen (CORS). Das liegt am Browser, nicht an der Anzeige — kein Umbau ändert
-etwas daran, und eine Abkürzung über einen fremden Vermittler hieße, die Zugangsdaten dorthin zu
-geben. Auf dem Anzeigegerät allein bleibt deshalb: **in EIRE anmelden, PDF öffnen, einmal
-antippen — den Rest macht die Anzeige.**
+Die App enthält die Anzeige und meldet sich selbst bei EIRE an. Das darf eine Webseite im Browser
+nicht (CORS), eine App schon.
+
+**Installieren**, einmalig auf dem Tablet:
+
+1. `https://github.com/deix97/IFPLA/releases/latest/download/fahrplan.apk` in Chrome öffnen.
+2. Die heruntergeladene `fahrplan.apk` öffnen. Android fragt einmal, ob Chrome Apps installieren
+   darf — erlauben, dann *Installieren*.
+3. „Fahrplan“ starten, unter **Zugang zu EIRE** Benutzername und Passwort eintragen, *Speichern*.
+
+**Bei jedem Dienst:** Zugnummer eingeben (Datum steht auf heute), *Fahrpläne suchen*, den
+passenden Fahrplan antippen. Die App zeigt die Liste wie EIRE, getrennt nach Gesamt- und
+Einzelblattfahrplänen. **Welcher gilt, wählst du selbst** — die App nimmt nie von sich aus einen,
+denn Varianten wie *Mbr 65 G* und *altern. Mbr 67 R/P* hängen von Lok und Bremsstellung ab.
+Meldet der Leser keine unsicheren Stellen, springt die App gleich zur Anzeige, sonst bleibt der
+Bericht zum Vergleich mit der PDF offen. Verlangt EIRE ein Einmalkennwort, erscheint ein Feld dafür.
+
+**Zugangsdaten:** Sie liegen verschlüsselt mit einem Schlüssel aus dem Android-Schlüsselspeicher
+und gehen nur an `eire.noncd.db.de`. Sie werden weder gesichert noch auf ein neues Gerät
+übertragen. *Zugang löschen* entfernt sie samt Schlüssel.
+
+**Updates:** Jede Änderung baut GitHub neu (Ablauf `.github/workflows/android-app.yml`); die neue
+`fahrplan.apk` einfach über die alte installieren, Zugang und Einstellungen bleiben. Der
+Signaturschlüssel liegt offen im Repo (`android/fahrplan.keystore`), damit jeder Bau dieselbe
+Unterschrift trägt. Deshalb: **Updates nur von der Release-Seite dieses Repos installieren.**
+
+Außerdem in der App: Teilen und „Öffnen mit“ für PDF, Dateiauswahl für Fahrplan und La, Ortung,
+Bildschirm wach, Vollbild. Die Zurück-Geste schließt nur Blätter, nie die Anzeige.
+
+**Wie sie mit EIRE spricht** — genau wie die EIRE-Webseite selbst:
+`POST /ui-api/authentication/login` (Benutzername, Passwort, bei Bedarf Einmalkennwort) liefert
+ein Token, dann `GET /ui-api/timetables?trainNumber=…&date=JJJJMMTT` für die Liste und
+`GET /ui-api/timetables/{id}?date=…&pages=&twoPagesOnOne=true|false` für die PDF, jeweils mit
+`Authorization: Bearer`. Ändert DB InfraGO diese Schnittstelle, muss die App nachziehen.
+
+## Im Browser, ohne App
+
+Aus einer Webseite heraus lässt sich EIRE nicht abrufen (siehe oben). Im Browser bleibt deshalb:
+**in EIRE anmelden, PDF herunterladen, einmal antippen — den Rest macht die Anzeige.**
 
 | Weg | Gerät | Handgriff je Dienst |
 | --- | --- | --- |
@@ -19,11 +53,7 @@ antippen — den Rest macht die Anzeige.**
 | **Download-Ordner** | Chrome/Edge am Rechner | nur herunterladen, die Anzeige nimmt sie selbst |
 | **Quelle (JSON/URL)** | überall | keiner, wenn ein Helfer die PDF bereitlegt |
 
-Soll gar nichts mehr angetippt werden, braucht es einen zweiten Rechner, der sich bei EIRE anmeldet
-und die PDF in einen Ordner legt (`werkzeug/quelle.mjs` liefert sie dann an die Anzeige). Der
-Anmeldeteil ist nicht gebaut.
-
-## Ein Dienst auf dem Tablet
+### Ein Dienst im Browser auf dem Tablet
 
 1. In Chrome `https://eire.noncd.db.de` öffnen und anmelden (nicht im Inkognito-Fenster, sonst
    merkt Chrome weder Anmeldung noch Passwort).
@@ -35,7 +65,7 @@ Anmeldeteil ist nicht gebaut.
 Die Anzeige öffnet sich und liest den Fahrplan. Teilt man stattdessen die geöffnete Seite, kommt
 nur ein Link an; die Anzeige sagt das dann und nennt den richtigen Weg.
 
-## Auf dem Android-Tablet installieren
+## Browser-Fassung als App installieren
 
 1. In Chrome `https://deix97.github.io/IFPLA/` öffnen.
 2. Oben im Blatt *Fahrplan laden* auf **Als App installieren** tippen, bestätigen.
@@ -127,6 +157,8 @@ lässt sich mit `?pdfjs=…` setzen; sie wird gemerkt.
 | `symbol/` | Symbole der installierten Anzeige |
 | `lib/` | pdf.js 3.11.174 samt Lizenz |
 | `werkzeug/quelle.mjs` | kleiner Server für PDF-Ordner und Verzeichnis |
+| `android/` | Android-App: Hülle um die Anzeige und Zugriff auf EIRE |
+| `.github/workflows/android-app.yml` | baut die App und legt sie als Release ab |
 
 Fahrplan-PDF werden nirgends dauerhaft abgelegt: eine geteilte PDF liegt bis zum Start der Anzeige
 kurz in der Ablage des Dienstarbeiters und wird dann gelöscht, alles Weitere bleibt im Speicher des
