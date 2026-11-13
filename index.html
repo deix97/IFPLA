@@ -213,7 +213,6 @@ button{font:inherit;color:inherit}
 .klar{font-size:.86rem;color:var(--ink-soft);max-width:65ch;margin:0}
 .meldung{border-left:.3rem solid var(--la);background:var(--la-bg);color:var(--la-ink);padding:.4rem .6rem;font-size:.9rem;max-width:65ch}
 .feld{min-height:44px;flex:1 1 17rem;min-width:8rem;padding:.3rem .5rem;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--ink);font:inherit}
-.feld.schmal{flex:0 0 4.6rem;width:4.6rem;min-width:0;text-align:center}
 .ankreuz{display:inline-flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-height:44px;font-size:.86rem;color:var(--ink-soft)}
 .ankreuz input[type=checkbox]{width:1.15rem;height:1.15rem;accent-color:var(--marker)}
 .meldung[hidden]{display:none}
@@ -293,7 +292,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
           <button class="knopf" type="button" id="auto-hol">Jetzt holen</button>
         </div>
         <div class="reihe">
-          <label class="ankreuz"><input type="checkbox" id="auto-an"> Beim Start holen und alle <input class="feld schmal num" type="number" id="auto-takt" min="1" max="240" step="1" aria-label="Minuten zwischen zwei Abrufen"> Minuten erneut</label>
+          <label class="ankreuz"><input type="checkbox" id="auto-an"> Beim Start holen</label>
         </div>
         <p class="klar">Die Quelle ist ein JSON-Verzeichnis <code>{"stand":"&hellip;","plan":"&hellip;.pdf","la":["&hellip;.pdf"]}</code> oder direkt eine PDF; relative Pfade gelten gegen die Quelle. Abgerufen wird vom Browser dieses Geräts, gelesen wird wie bei der Dateiauswahl. Fahrplan und La gehen auch so nur in den Speicher dieses Tabs. Per Adresse: <code>?plan=&hellip;</code>, <code>?la=&hellip;,&hellip;</code>, <code>?quelle=&hellip;&amp;auto=1</code>.</p>
       </div>
@@ -8538,8 +8537,8 @@ function ladeLa(dateien) {
    oder direkt eine PDF. Relative Pfade gelten gegen die Quelle. Geholt wird vom
    Browser dieses Geräts, gelesen wird mit demselben Weg wie bei der Dateiauswahl. */
 var AUTO_SPEICHER = 'fahrplananzeige.auto';
-var autoKonf = { quelle: '', an: false, takt: 10 };
-var autoStand = '', autoUhr = null, autoLaeuft = false;
+var autoKonf = { quelle: '', an: false };
+var autoStand = '', autoLaeuft = false;
 
 function autoLies() {
   try {
@@ -8547,18 +8546,15 @@ function autoLies() {
     if (k && typeof k === 'object') {
       if (typeof k.quelle === 'string') autoKonf.quelle = k.quelle;
       autoKonf.an = !!k.an;
-      var t = Number(k.takt);
-      if (t >= 1 && t <= 240) autoKonf.takt = Math.round(t);
     }
   } catch (e) {}
 }
 function autoSchreibe() { try { localStorage.setItem(AUTO_SPEICHER, JSON.stringify(autoKonf)); } catch (e) {} }
 function autoMeldung(text) { var el = $('auto-meldung'); if (!el) return; el.textContent = text || ''; el.hidden = !text; }
 function autoFelder() {
-  var q = $('auto-quelle'), a = $('auto-an'), t = $('auto-takt');
+  var q = $('auto-quelle'), a = $('auto-an');
   if (q) q.value = autoKonf.quelle;
   if (a) a.checked = autoKonf.an;
-  if (t) t.value = String(autoKonf.takt);
 }
 function autoName(url) {
   var n = String(url).split('#')[0].split('?')[0].split('/').pop() || 'abruf.pdf';
@@ -8628,21 +8624,10 @@ function autoHole(stumm) {
     .catch(function (e) { autoMeldung('Abruf fehlgeschlagen: ' + autoFehlerText(e)); return false; })
     .then(function (ok) { autoLaeuft = false; return ok; });
 }
-function autoUhrStellen() {
-  if (autoUhr) { clearInterval(autoUhr); autoUhr = null; }
-  var quelleAn = autoKonf.an && !!(autoKonf.quelle || '').trim();
-  if (!quelleAn && !ordnerGriff) return;
-  autoUhr = setInterval(function () {
-    if (document.visibilityState === 'hidden') return;
-    if (quelleAn) autoHole(true);
-    if (ordnerGriff) ordnerSchau(true);
-  }, Math.max(1, Math.min(240, autoKonf.takt)) * 60000);
-}
-function autoSetze(quelle, an, takt) {
+function autoSetze(quelle, an) {
   if (quelle != null) autoKonf.quelle = String(quelle).trim();
   if (an != null) autoKonf.an = !!an;
-  if (takt != null) { var t = Number(takt); if (t >= 1 && t <= 240) autoKonf.takt = Math.round(t); }
-  autoSchreibe(); autoFelder(); autoUhrStellen();
+  autoSchreibe(); autoFelder();
 }
 /* Steuerbar von außen, z. B. aus einem Kiosk-Rahmen oder einem Skript:
    Automatik.plan(url), Automatik.la([url, ...]), Automatik.hole(), Automatik.setze({...}) */
@@ -8659,8 +8644,8 @@ window.Automatik = {
     return istLa ? ladeLa([d]) : ladeDatei(d);
   },
   verzeichnis: function (m) { return Promise.resolve().then(function () { return autoNimm(m || {}, false); }); },
-  setze: function (k) { k = k || {}; autoSetze(k.quelle, k.an, k.takt); return { quelle: autoKonf.quelle, an: autoKonf.an, takt: autoKonf.takt }; },
-  stand: function () { return { quelle: autoKonf.quelle, an: autoKonf.an, takt: autoKonf.takt, stand: autoStand, plan: !!plan, la: laDocs.length }; }
+  setze: function (k) { k = k || {}; autoSetze(k.quelle, k.an); return { quelle: autoKonf.quelle, an: autoKonf.an }; },
+  stand: function () { return { quelle: autoKonf.quelle, an: autoKonf.an, stand: autoStand, plan: !!plan, la: laDocs.length }; }
 };
 
 /* ---------- Übernahme vom Gerät: geteilte PDF, geöffnete Datei, Download-Ordner ----------
@@ -8743,7 +8728,7 @@ function ordnerWaehlen() {
   if (!window.showDirectoryPicker) { autoMeldung('Dieser Browser kann keinen Ordner lesen. Dann der Weg über Teilen.'); return; }
   window.showDirectoryPicker({ id: 'fahrplan', mode: 'read', startIn: 'downloads' }).then(function (g) {
     ordnerGriff = g; ordnerMerke('');
-    return griffLegen(g).then(function () { ordnerZeige(); autoUhrStellen(); return ordnerSchau(false); });
+    return griffLegen(g).then(function () { ordnerZeige(); return ordnerSchau(false); });
   })['catch'](function (e) {
     if (e && e.name === 'AbortError') return;
     autoMeldung('Der Ordner ließ sich nicht öffnen: ' + ((e && e.message) || 'unbekannter Fehler'));
@@ -8751,7 +8736,7 @@ function ordnerWaehlen() {
 }
 function ordnerVergessen() {
   ordnerGriff = null; ordnerMerke('');
-  griffLegen(null).then(function () { ordnerZeige(); autoUhrStellen(); autoMeldung('Der Ordner wird nicht mehr gelesen.'); });
+  griffLegen(null).then(function () { ordnerZeige(); autoMeldung('Der Ordner wird nicht mehr gelesen.'); });
 }
 function ordnerRecht(fragen) {
   if (!ordnerGriff || !ordnerGriff.queryPermission) return Promise.resolve(true);
@@ -8999,14 +8984,15 @@ $('sitzung-weg').addEventListener('click', loescheSitzung);
 $('leer-laden').addEventListener('click', function () { zeigeBlatt('t-zug'); zeigeBericht(); });
 $('la-datei').addEventListener('change', function () { if (this.files && this.files.length) ladeLa(this.files); this.value = ''; });
 $('la-weg').addEventListener('click', entferneLa);
-$('auto-hol').addEventListener('click', function () { autoSetze($('auto-quelle').value, null, null); autoHole(false); });
-$('auto-quelle').addEventListener('change', function () { autoSetze(this.value, null, null); });
-$('auto-quelle').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); autoSetze(this.value, null, null); autoHole(false); } });
-$('auto-an').addEventListener('change', function () { autoSetze($('auto-quelle').value, this.checked, null); autoMeldung(this.checked ? 'Automatik an: beim Start und alle ' + autoKonf.takt + ' Minuten.' : 'Automatik aus.'); });
-$('auto-takt').addEventListener('change', function () { autoSetze(null, null, this.value); autoFelder(); });
+$('auto-hol').addEventListener('click', function () { autoSetze($('auto-quelle').value, null); autoHole(false); });
+$('auto-quelle').addEventListener('change', function () { autoSetze(this.value, null); });
+$('auto-quelle').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); autoSetze(this.value, null); autoHole(false); } });
+$('auto-an').addEventListener('change', function () { autoSetze($('auto-quelle').value, this.checked); autoMeldung(this.checked ? 'Die Quelle wird beim Start abgefragt.' : 'Die Quelle wird beim Start nicht abgefragt.'); });
 $('auto-ordner').addEventListener('click', ordnerWaehlen);
 $('auto-ordner-weg').addEventListener('click', ordnerVergessen);
+/* kein Takt: der Ordner wird angesehen, sobald die Anzeige wieder vorn ist */
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && ordnerGriff) ordnerSchau(true); });
+window.addEventListener('focus', function () { if (ordnerGriff) ordnerSchau(true); });
 $('blatt-la').addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-offen],[data-eintrag]'); if (!b || !laZu) return;
   var o = b.dataset.offen != null ? laZu.offen[Number(b.dataset.offen)] : laZu.eintraege[Number(b.dataset.eintrag)];
@@ -9055,13 +9041,12 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(function (
   autoLies();
   var P = null;
   try { P = new URLSearchParams(location.search); } catch (e) { P = null; }
-  var q = P && P.get('quelle'), an = P && P.get('auto'), takt = P && P.get('takt');
-  if (q != null || an != null || takt != null) autoSetze(q, an == null ? null : (an !== '0' && an !== 'aus' && an !== 'false'), takt);
+  var q = P && P.get('quelle'), an = P && P.get('auto');
+  if (q != null || an != null) autoSetze(q, an == null ? null : (an !== '0' && an !== 'aus' && an !== 'false'));
   else autoFelder();
-  autoUhrStellen();
   dateiHandhabe();
   try { ordnerZuletzt = sessionStorage.getItem(ORDNER_SPEICHER) || ''; } catch (e) {}
-  var ordnerBereit = griffHolen().then(function (g) { ordnerGriff = g || null; ordnerZeige(); autoUhrStellen(); });
+  var ordnerBereit = griffHolen().then(function (g) { ordnerGriff = g || null; ordnerZeige(); });
   var pUrl = P && P.get('plan'), laUrl = P && P.get('la');
   uebergabeHolen().then(function (kam) {
     if (kam) return;

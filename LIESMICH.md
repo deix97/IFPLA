@@ -33,7 +33,7 @@ im Browsermenü *Zum Startbildschirm hinzufügen* bzw. *Installieren*. Dafür li
 ## Download-Ordner beobachten
 
 Blatt **Fahrplan laden → Vom Gerät übernehmen → Ordner wählen**, dort den Download-Ordner angeben.
-Die Anzeige nimmt beim Start, beim Zurückwechseln und im eingestellten Takt die **jüngste PDF**
+Die Anzeige nimmt beim Start und jedes Mal, wenn sie wieder vorn ist, die **jüngste PDF**
 daraus. Dateinamen, die mit `la` beginnen, bleiben liegen. Gelesen wird nur; der Ordner bleibt
 gewählt, bis *Ordner vergessen* gedrückt wird. Chrome und Edge am Rechner können das, Safari und
 Chrome auf Android nicht — dort der Weg über Teilen.
@@ -51,15 +51,14 @@ Unter **Automatisch holen** steht eine Quelle: entweder direkt eine PDF oder ein
 ```
 
 Relative Pfade gelten gegen die Quelle. Ändert sich `stand` nicht, wird nichts neu geladen.
-`Beim Start holen und alle … Minuten erneut` taktet den Abruf.
+`Beim Start holen` fragt die Quelle beim Öffnen der Anzeige ab, sonst holt `Jetzt holen`.
 
 Über die Adresse geht es ohne Eintippen — praktisch für einen Kiosk-Browser:
 
 | Teil | Wirkung |
 | --- | --- |
 | `?quelle=…` | Quelle setzen und merken |
-| `?auto=1` | beim Start holen und takten (`?auto=0` aus) |
-| `?takt=5` | Minuten zwischen zwei Abrufen |
+| `?auto=1` | beim Start holen (`?auto=0` aus) |
 | `?plan=…` | einmalig diese Fahrplan-PDF holen |
 | `?la=…,…` | einmalig diese La-PDF holen |
 | `?pdfjs=/lib/` | pdf.js aus eigener Ablage statt von cdnjs |
@@ -85,7 +84,7 @@ node werkzeug/quelle.mjs --ordner ./pdf
 ```
 
 Dann `http://127.0.0.1:8723/?quelle=/fahrplan.json&auto=1` öffnen. Neue PDF in den Ordner legen,
-die Anzeige holt sie beim nächsten Takt. Einteilung nach Dateiname: beginnt er mit `la`, gilt die
+die Anzeige holt sie beim nächsten Öffnen oder mit `Jetzt holen`. Einteilung nach Dateiname: beginnt er mit `la`, gilt die
 Datei als Tages-La (je Bereich — Nord, Ost, Mitte, Südost, Süd — die jüngste), sonst als
 Blattfahrplan (die jüngste). Eigenes Verzeichnis: `--verzeichnis ./fahrplan.json`.
 Weitere Schalter: `--port`, `--app`, `--lib`, `--cors`.
