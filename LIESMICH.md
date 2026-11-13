@@ -37,11 +37,37 @@ Unterschrift trägt. Deshalb: **Updates nur von der Release-Seite dieses Repos i
 Außerdem in der App: Teilen und „Öffnen mit“ für PDF, Dateiauswahl für Fahrplan und La, Ortung,
 Bildschirm wach. Die App läuft immer im Vollbild; die Zurück-Geste schließt nur Blätter, nie die Anzeige.
 
-**PDF teilen, z. B. aus DiLoc:** Die Anzeige erkennt an Seite 1, was ankommt. Eine Tages-La (Deckblatt
-„La-Bereich …“) geht an den La-Leser, alles andere an den Fahrplan-Leser; findet der keine Tabelle,
-versucht sie es noch als La. Mehrere PDF auf einmal gehen auch, etwa mehrere La-Bereiche und ein
-Fahrplan; es gilt immer nur ein Fahrplan. Fahrplananordnungen (Fplo) erkennt sie und sagt das, lesen
-kann sie sie noch nicht. Dasselbe gilt für „PDF auswählen“ und „Öffnen mit“, auch im Browser.
+**PDF teilen, z. B. aus DiLoc:** Die Anzeige erkennt an Seite 1, was ankommt: Tages-La (Deckblatt
+„La-Bereich …“), Fahrplananordnung (Fplo), Ersatzfahrplan (Efpl-Heft) oder Blattfahrplan. Findet der
+Fahrplan-Leser keine Tabelle, versucht sie es noch als La. Mehrere PDF auf einmal gehen auch; es gilt
+immer nur ein Fahrplan. Dasselbe gilt für „PDF auswählen“ und „Öffnen mit“, auch im Browser.
+
+## Fahrplananordnung (Fplo) mit Ersatzfahrplan
+
+Eine Fplo nennt je Zug die Betriebsstellen mit Ankunft und Abfahrt und verweist mit „Bfpl 3995 S.400
+Sp. 2d“ ins Ersatzfahrplan-Heft. Aus beidem baut die Anzeige den Fahrplan: Strecke, km, Signale und
+Geschwindigkeit der genannten Spalte (2a–2d, je eine Zugklasse) aus dem Heft, die Zeiten aus der Fplo.
+
+1. **Einmal:** die Fplo und die Hefte, die sie nennt (z. B. 3993–3996), aus DiLoc an die
+   Fahrplananzeige teilen. Sie bleiben auf dem Gerät; abgelaufene Fplo verschwinden von selbst.
+   Unter *Gespeichert: …* lässt sich alles einzeln entfernen.
+2. **Je Dienst:** im Blatt *Fahrplan laden* unter *Fahrplananordnung (Fplo) mit Ersatzfahrplan* Datum
+   wählen (steht auf heute), ggf. Zugnummer eingeben, den Zug antippen.
+
+Gibt es zu einem Zug mehrere Fassungen (z. B. 6.3 und 6.4), steht dabei, an welchem Tag er fährt;
+die Anzeige baut immer die zum gewählten Tag. Fehlt ein Heft, sagt sie welches.
+
+Wie gelesen wird:
+* Eine Heftseite trägt oft mehrere Tabellen. Endet die eigene mit „Fortsetzung Seite N“, geht es auf
+  Seite N beim passenden „Forts. …“-Kopf weiter; die Tabellen dazwischen gehören zu anderen Wegen.
+* Fplo und Heft kürzen Betriebsstellen verschieden ab („K-Ehrenf Pbf“ / „Bft K-Ehrenfeld Pbf“). Die
+  Zuordnung sucht die beste Übereinstimmung in der richtigen Reihenfolge.
+* Führt die Fplo über das Ende einer Strecke hinaus, ohne neuen Heftverweis (z. B. Münster → Rheine),
+  sucht die Anzeige im Heft die anschließende Tabelle in Fahrtrichtung, notfalls in den anderen Heften,
+  die die Fplo für den Zug nennt.
+* Jeder Heftabschnitt beginnt in der Anzeige mit einer Zeile „– Heft 3995 ab S. 400, Spalte 2d –“.
+* Betriebsstellen der Fplo, die im Heft nicht zu finden sind, stehen im Bericht unter *Mit der PDF
+  vergleichen*; ihre Zeit fehlt dann in der Anzeige. **Maßgebend bleiben Fplo und Heft.**
 
 **Wie sie mit EIRE spricht** — genau wie die EIRE-Webseite selbst:
 `POST /ui-api/authentication/login` (Benutzername, Passwort, bei Bedarf Einmalkennwort) liefert

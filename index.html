@@ -308,6 +308,20 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
           </div>
         </details>
       </div>
+      <div class="gruppe" id="fplo">
+        <span class="gl">Fahrplananordnung (Fplo) mit Ersatzfahrplan</span>
+        <div class="reihe">
+          <input class="feld eng" type="text" id="fplo-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer in den Fplo suchen">
+          <input class="feld eng" type="date" id="fplo-datum" aria-label="Verkehrstag">
+        </div>
+        <div class="meldung" id="fplo-meldung" role="status" hidden></div>
+        <div class="gruppe" id="fplo-liste"></div>
+        <details class="aufklapp" id="fplo-ablage">
+          <summary id="fplo-ablage-titel">Gespeicherte Fplo und Ersatzfahrpläne</summary>
+          <ul class="liste" id="fplo-dok"></ul>
+          <p class="klar">Fplo und die Ersatzfahrpläne (Efpl-Hefte) einmal an die Fahrplananzeige teilen, z. B. aus DiLoc. Sie bleiben auf diesem Gerät, bis du sie entfernst; abgelaufene Fplo verschwinden von selbst. Der Fahrplan entsteht aus beiden: Strecke, km und Geschwindigkeit aus dem Heft, die Zeiten aus der Fplo. Welche Betriebsstellen nicht zugeordnet werden konnten, steht danach im Bericht.</p>
+        </details>
+      </div>
       <div class="gruppe" id="installieren" hidden>
         <span class="gl">Als App auf diesem Gerät</span>
         <div class="reihe"><button class="knopf" type="button" id="installieren-knopf">Als App installieren</button></div>
@@ -1012,7 +1026,458 @@ function parse(pdfSeiten, opt) {
   return { kopf: kopf, regel: alle[0], alternativen: alle.slice(1), blattseiten: S.length, pdfSeiten: pdfSeiten.length, seiten: S.map(function (s) { return { nr: s.nr, pdf: s.pdfSeite, x0: Math.round(s.x0) }; }), form: S.every(function (s) { return s.ma === 1; }) ? 'zweispaltig' : S.every(function (s) { return s.ma > 1.2; }) ? 'einspaltig' : 'gemischt', massstab: Math.round(S[0].ma * 1000) / 1000, zeiten: z.zeiten, basis: z.basis, warnungen: warnungen };
 }
 
-var api = { lesePdf: lesePdf, parse: parse, blattseiten: blattseiten, zeilenAus: zeilenAus, eintragName: eintragName };
+/* ---------- 6. Ersatzfahrplan (Efpl-Heft) und Fahrplananordnung (Fplo) ----------
+   Ein Efpl-Heft ist ein Buchfahrplan je Strecke: statt Spalte 2 vier Geschwindigkeitsspalten 2a–2d (je eine
+   Zugklasse, z. B. 70/80/90/100 km/h), statt 4 und 5 die Mindestfahrzeiten 4a–4d. Eine Heftseite wird für die
+   gewählte Spalte in eine Blattseite übersetzt und dann mit leseBloecke() gelesen wie ein Blattfahrplan.
+   Die Fplo nennt je Zug die Betriebsstellen mit Ankunft und Abfahrt und verweist mit
+   „Bfpl <Heft> S.<Seite> Sp. <Spalte>“ ins Heft, ab wo welche Heftseite und Spalte gilt. */
+var MONAT = { januar: 1, februar: 2, 'märz': 3, april: 4, mai: 5, juni: 6, juli: 7, august: 8, september: 9, oktober: 10, november: 11, dezember: 12 };
+var RE_FZEIT = /^(\d{1,2}\.\d{2}|\d{2})$/;
+
+async function leseText(pdfjsLib, page) {
+  var vp = page.getViewport({ scale: 1 }), tc = await page.getTextContent(), items = [];
+  tc.items.forEach(function (it) {
+    if (!it.str || !it.str.trim()) return;
+    var m = pdfjsLib.Util.transform(vp.transform, it.transform);
+    items.push({ s: it.str, x: m[4], y: m[5], w: it.width, h: it.height });
+  });
+  return { w: vp.width, h: vp.height, items: items };
+}
+function zeilenVon(items, tol) {
+  var z = [];
+  items.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; }).forEach(function (it) {
+    var l = z[z.length - 1];
+    if (l && Math.abs(it.y - l.y) <= tol) l.its.push(it); else z.push({ y: it.y, its: [it] });
+  });
+  z.forEach(function (l) { l.its.sort(function (a, b) { return a.x - b.x; }); l.text = norm(l.its.map(function (i) { return i.s; }).join(' ')); });
+  return z;
+}
+
+/* Kopfmarken einer Heftseite: Mitte von „1“, „2a“ … „4a“ auf einer Zeile, oder null */
+function heftSpalten(pg) {
+  var marken = ['1', '2a', '2b', '2c', '2d', '3a', '3b', '4a'], L = {};
+  pg.items.forEach(function (it) { var s = it.s.trim(); if (marken.indexOf(s) >= 0) (L[s] = L[s] || []).push(it); });
+  if (!L['2a'] || !L['3b'] || !L['4a']) return null;
+  for (var i = 0; i < L['2a'].length; i++) {
+    var a = L['2a'][i], k = { y: a.y };
+    var ok = marken.every(function (n) {
+      var t = (L[n] || []).filter(function (b) { return Math.abs(b.y - a.y) < 3; })[0];
+      if (t) k[n] = t.x + (t.w || 0) / 2;
+      return !!t;
+    });
+    if (ok) return k;
+  }
+  return null;
+}
+
+/* Heftseite → Blattseite für Spalte '2a'…'2d'; null, wenn die Seite keine Fahrplantabelle ist */
+function ersatzBlattseite(pg, spalte, pdfSeite) {
+  var k = heftSpalten(pg);
+  if (!k) return null;
+  var abkm = pg.items.filter(function (i) { return /^ab km$/.test(i.s.trim()) && i.y > k.y; })[0];
+  var y0 = abkm ? abkm.y + 4 : k.y + 45, y1 = pg.h, nr = null, strecke = '', heft = '';
+  pg.items.forEach(function (i) {
+    var t = norm(i.s), m = /^Seite (\d+)$/.exec(t);
+    if (m) { nr = Number(m[1]); y1 = Math.min(y1, i.y - 4); }
+    if (/^Strecke\s/.test(t) && i.y < k.y) strecke = t;
+  });
+  pg.items.forEach(function (i) { if (/^\d{4}$/.test(i.s.trim()) && Math.abs(i.y - (y1 + 4)) < 3) heft = i.s.trim(); });
+  var drin = pg.items.filter(function (i) { return i.y > y0 && i.y < y1; });
+  /* Schrifthöhe auf die der Blattseite bringen: normale Zeilen ~9,5, hochgestellte Ziffern < 8 */
+  var hs = drin.map(function (i) { return i.h; }).filter(function (h) { return h > 0; }).sort(function (a, b) { return a - b; });
+  var fh = hs.length ? 9.5 / hs[Math.floor(hs.length * 0.6)] : 1;
+  var vEnde = k['2d'] + 12, kmAb = k['3b'] - 14, zeitAb = k['4a'] - 9, vNamen = ['2a', '2b', '2c', '2d'];
+  var items = [], zeitY = [];
+  drin.forEach(function (it) {
+    var s = it.s.trim(), cx = it.x + (it.w || 0) / 2, x;
+    if (cx >= zeitAb) { if (/^\d+$/.test(s)) zeitY.push(it.y); return; }       // Mindestfahrzeiten
+    if (cx < k['2a'] - 14) x = 30;                                               // Spalte 1
+    else if (it.x < vEnde) {                                                     // Spalten 2a–2d
+      var best = null;
+      vNamen.forEach(function (n) { if (best === null || Math.abs(cx - k[n]) < Math.abs(cx - k[best])) best = n; });
+      if (best !== spalte) return;
+      x = 70;
+    }
+    else if (it.x >= kmAb && (RE_KM.test(s) || RE_PLUS.test(s))) x = 250;        // Spalte 3b
+    else if (/^[#ÀÁ$]+$/.test(s) && it.x >= k['3b'] - 40) x = 225;               // Tunnel, Sägezahn
+    else x = Math.min(150, 92 + (it.x - vEnde) * 0.45);                         // Spalte 3a
+    items.push({ s: it.s, x: x, y: it.y, w: (it.w || 0) * 0.45, h: it.h * fh });
+  });
+  /* Zeitpunkte: Betriebsstellen mit Mindestfahrzeiten. Steht bei einer keine km-Angabe (z. B. „Abzw Südbrücke“),
+     bekommt sie die der nächsten Zeile, sonst hinge der Leser sie an die Zeile davor. */
+  var zeitpunkte = [], kmZeilen = items.filter(function (i) { return i.x === 250 && RE_KM.test(i.s.trim()); });
+  zeilenVon(drin.filter(function (i) { return i.x >= vEnde && i.x < kmAb; }), 2.5).forEach(function (l) {
+    if (!zeitY.some(function (y) { return Math.abs(y - l.y) < 3; })) return;
+    zeitpunkte.push(l.text);
+    if (kmZeilen.some(function (k) { return Math.abs(k.y - l.y) < 3; })) return;
+    var nach = kmZeilen.filter(function (k) { return k.y > l.y && k.y - l.y < 45; })[0], vor = kmZeilen.filter(function (k) { return k.y < l.y && l.y - k.y < 45; }).pop();
+    var k = nach || vor;
+    if (k) items.push({ s: k.s, x: 250, y: l.y, w: k.w, h: k.h });
+  });
+  return { nr: nr, pdfSeite: pdfSeite, x0: 0, ma: 1, kopf: [], fuss: [], items: items, rects: [], strecke: strecke, heft: heft, zeitpunkte: zeitpunkte };
+}
+
+/* Zugriff auf ein Heft nach gedruckter Seitenzahl; Versatz gedruckt → PDF wird gesucht und gemerkt */
+function heftZugriff(pdfjsLib, doc) {
+  var cache = {}, versatz = 1;
+  async function pdfSeite(p) {
+    if (!cache[p]) cache[p] = doc.getPage(p).then(function (pg) { return leseText(pdfjsLib, pg); });
+    return cache[p];
+  }
+  function gedruckt(pg) { for (var i = 0; i < pg.items.length; i++) { var m = /^Seite (\d+)$/.exec(norm(pg.items[i].s)); if (m) return Number(m[1]); } return null; }
+  return {
+    doc: doc,
+    seite: async function (nr) {
+      var versuche = [versatz, 0, 1, 2, 3, 4, 5, 6, -1, -2, 8, 10];
+      for (var i = 0; i < versuche.length; i++) {
+        var p = nr + versuche[i];
+        if (p < 1 || p > doc.numPages) continue;
+        var pg = await pdfSeite(p);
+        if (gedruckt(pg) === nr) { versatz = versuche[i]; pg.pdfSeite = p; return pg; }
+      }
+      return null;
+    },
+    /* Betriebsstellen jeder Fahrplanseite (gedruckte Seite, Namen in Reihenfolge); liest das Heft einmal ganz */
+    streckenIndex: function () {
+      if (this._index) return this._index;
+      this._index = (async function () {
+        var liste = [];
+        for (var p = 1; p <= doc.numPages; p++) {
+          var pg = await pdfSeite(p), B = ersatzBlattseite(pg, '2a', p);
+          delete cache[p];
+          if (!B || B.nr === null) continue;
+          var namen = [];
+          zeilenVon(B.items, 2.5).forEach(function (r) {
+            var t = norm(r.its.filter(function (i) { return i.x > 85 && i.x < 160; }).map(function (i) { return i.s; }).join(' '));
+            if (t && !RE_INFO.test(t) && !RE_KEINNAME.test(t) && !/^(Forts\.|Fortsetzung)\s/.test(t)) namen.push(t);
+          });
+          liste.push({ nr: B.nr, strecke: B.strecke, namen: namen });
+        }
+        return liste;
+      })();
+      return this._index;
+    },
+    kopf: async function () {
+      var pg = await pdfSeite(1), t = norm(pg.items.map(function (i) { return i.s; }).join(' '));
+      var n = /Ersatzfahrplan\s+(\d{4})/.exec(t), g = /Gültig ab\s+(\d{1,2})\.\s*([A-Za-zäöü]+)\s+(\d{4})/.exec(t), ab = null;
+      if (g && MONAT[g[2].toLowerCase()]) ab = Number(g[3]) * 10000 + MONAT[g[2].toLowerCase()] * 100 + Number(g[1]);
+      return { nr: n ? n[1] : '', gueltigAb: ab, titel: n ? 'Ersatzfahrplan ' + n[1] : '' };
+    }
+  };
+}
+
+/* Ähnlichkeit eines Fplo-Kurznamens mit einem Heftnamen (0 = keine) */
+function kompakt(s) { return norm(s).toLowerCase().replace(/perswechs\w*|personalwechsel\w*/g, 'pw').replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss').replace(/[^a-z0-9]/g, ''); }
+/* Fplo und Heft kürzen verschieden ab („K Eifeltor Enf“ / „K Eifelt Enf“, „Köln Süd Abzw“ / „Abzw Köln Süd“,
+   „K-Ehrenf Pbf“ / „Bft K-Ehrenfeld Pbf“): Art der Betriebsstelle weglassen, dann gemeinsame Buchstabenfolge */
+var RE_BSTART = /^(bft|abzw|awanst|anst|hp|bk|üst|ust|bf)$/;
+function woerter(s) { return norm(s).toLowerCase().split(/[\s\/\-.(),]+/).map(kompakt).filter(function (w) { return w && !RE_BSTART.test(w); }); }
+function kern(s) { return kompakt(norm(s).toLowerCase().split(/[\s\/\-.(),]+/).filter(function (w) { return w && !RE_BSTART.test(w); }).join(' ')); }
+function lcs(a, b) {
+  var vor = new Array(b.length + 1).fill(0), jetzt;
+  for (var i = 1; i <= a.length; i++) {
+    jetzt = [0];
+    for (var j = 1; j <= b.length; j++) jetzt[j] = a.charAt(i - 1) === b.charAt(j - 1) ? vor[j - 1] + 1 : Math.max(vor[j], jetzt[j - 1]);
+    vor = jetzt;
+  }
+  return vor[b.length];
+}
+function aehnlich(f, h) {
+  var best = 0;
+  [[kompakt(f), kompakt(h)], [kern(f), kern(h)]].forEach(function (p) {
+    var a = p[0], b = p[1], s = 0;
+    if (!a || !b) return;
+    if (a === b) s = 4;
+    else if (Math.min(a.length, b.length) >= 4 && (b.indexOf(a) === 0 || a.indexOf(b) === 0)) s = 3;
+    else if (a.charAt(0) === b.charAt(0) && Math.min(a.length, b.length) >= 5) {
+      var l = lcs(a, b), kurz = l / Math.min(a.length, b.length), lang = l / Math.max(a.length, b.length);
+      if ((kurz >= 0.8 && lang >= 0.6) || (kurz >= 0.95 && lang >= 0.5)) s = 1 + Math.max(lang, 0.55);
+    }
+    if (s > best) best = s;
+  });
+  /* längstes Wort des einen ist Anfang eines Worts des anderen („Köln Steinstr A“ / „Abzw Steinstraße“) */
+  if (best < 1.6) {
+    var wf = woerter(f), wh = woerter(h);
+    [[wf, wh], [wh, wf]].forEach(function (p) {
+      var lang = p[0].slice().sort(function (x, y) { return y.length - x.length; })[0];
+      if (lang && lang.length >= 6 && p[1].some(function (w) { return w.indexOf(lang) === 0 || (w.length >= 6 && lang.indexOf(w) === 0); })) best = 1.6;
+    });
+  }
+  return best;
+}
+
+/* Fplo lesen: Kopf und je Zug (Abschnitt wie „6.3“) die Fahrplanzeilen */
+function leseFplo(seiten) {
+  var zeilen = [];
+  seiten.forEach(function (pg, p) {
+    zeilenVon(pg.items, 2.5).forEach(function (l) {
+      if (/^ISA-v/.test(l.text) || /\bSeite \d+$/.test(l.text)) return;
+      l.seite = p + 1; zeilen.push(l);
+    });
+  });
+  var alles = zeilen.map(function (l) { return l.text; }).join('\n');
+  var name = (/^Fplo\s+(.+)$/im.exec(alles) || [])[1] || '';
+  var g = /gültig vom (\d{2})\.(\d{2})\.(\d{4}) bis (\d{2})\.(\d{2})\.(\d{4})/.exec(alles), g1 = /gültig am (\d{2})\.(\d{2})\.(\d{4})/.exec(alles);
+  var F = { name: norm(name), gueltigVon: g ? Number(g[3] + g[2] + g[1]) : g1 ? Number(g1[3] + g1[2] + g1[1]) : null, gueltigBis: g ? Number(g[6] + g[5] + g[4]) : g1 ? Number(g1[3] + g1[2] + g1[1]) : null, massnahme: '', zuege: [] };
+  var mm = /Baumaßnahme:\s*([^\n]+(?:\n(?!Kunde)[^\n]+)?)/.exec(alles);
+  if (mm) F.massnahme = norm(mm[1].replace(/\n/g, ' '));
+  /* Zeichenbreite und linker Rand der Fplo-Schrift (Schreibmaschinenschrift) */
+  var breiten = [], rand = Infinity;
+  zeilen.forEach(function (l) { l.its.forEach(function (i) { if (i.s.length >= 4 && i.w > 0) breiten.push(i.w / i.s.length); if (i.x < rand) rand = i.x; }); });
+  breiten.sort(function (a, b) { return a - b; });
+  var cw = breiten.length ? breiten[Math.floor(breiten.length / 2)] : 6;
+  function spalte(i) { return (i.x - rand) / cw; }
+
+  var Z = null;
+  function ende() { if (Z && Z.zug) F.zuege.push(Z); Z = null; }
+  for (var n = 0; n < zeilen.length; n++) {
+    var l = zeilen[n], t = l.text, m;
+    if (/^\d+\.\d+$/.test(t)) {
+      /* Zugblock nur, wenn bald eine Zeile „<Gattung> <Zugnummer>“ folgt */
+      var zugFolgt = false;
+      for (var q = n + 1; q < Math.min(zeilen.length, n + 9); q++) if (/^[A-Z][A-Za-z]{0,5}\s+\d{3,6}(\s+\(|$)/.test(zeilen[q].text)) { zugFolgt = true; break; }
+      ende();
+      if (zugFolgt) Z = { abschnitt: t, seite: l.seite, tageText: '', tage: [], von: null, bis: null, gattung: '', zug: '', laufweg: '', ueber: '', tfz: '', last: '', laenge: '', vmax: '', mbr: [], hefte: [], zeilen: [] };
+      continue;
+    }
+    if (!Z) continue;
+    if (/^-{10,}$/.test(t) || /^\d+\.\s+\S/.test(t)) { ende(); continue; }
+    if (!Z.zug) {
+      if ((m = /^([A-Z][A-Za-z]{0,5})\s+(\d{3,6})(?:\s+\(([^)]*)\))?$/.exec(t))) { Z.gattung = m[1]; Z.zug = m[2]; }
+      else Z.tageText = norm(Z.tageText + ' ' + t);
+      continue;
+    }
+    if (!Z.laufweg && / - /.test(t) && !/^ab /.test(t) && !Z.zeilen.length) { Z.laufweg = t; continue; }
+    if (/^über /.test(t) && !Z.zeilen.length) { Z.ueber = t.replace(/^über\s+/, ''); continue; }
+    if ((m = /^Tfz\s+(.+)$/.exec(t))) {
+      t.split(',').forEach(function (x, i) { x = norm(x); if (i === 0) Z.tfz = x.replace(/^Tfz\s*/, ''); else if (/ t$/.test(x)) Z.last = x.replace(/^Wagenzuglast\s*/, ''); else if (/ m$/.test(x)) Z.laenge = x.replace(/^Gesamtzuglänge\s*/, ''); });
+      continue;
+    }
+    if ((m = /^HG\s+(\d+)\s*km\/h/.exec(t))) { Z.vmax = m[1] + ' km/h'; continue; }
+    if ((m = /^ab (.+?) - Mbr (.+)$/.exec(t))) { Z.mbr.push({ ab: m[1], mbr: m[2] }); continue; }
+    if ((m = /^Bfpl\s+([\d,\s]+)$/.exec(t))) { Z.hefte = m[1].split(/[,\s]+/).filter(Boolean); continue; }
+    /* Fahrplanzeile: Name links, Ankunft ab Zeichen ~21, Abfahrt ab ~29, Bemerkung ab ~38 */
+    var name = [], an = [], ab = [], bem = [];
+    l.its.forEach(function (i) {
+      var c = spalte(i);
+      if (c < 20.5) name.push(i.s); else if (c < 28.5) an.push(i.s); else if (c < 37.5) ab.push(i.s); else bem.push(i.s);
+    });
+    var anT = norm(an.join(' ')), abT = norm(ab.join(' ')), halt = '';
+    if (/^\+/.test(anT)) { halt = '+'; anT = norm(anT.slice(1)); }
+    if (!name.length || !(RE_FZEIT.test(anT) || RE_FZEIT.test(abT))) continue;
+    var bemT = norm(bem.join(' ')), r = /Bfpl\s+(\d{4})\s+S\.\s*(\d+)\s+Sp\.\s*(2[a-d])/.exec(bemT);
+    Z.zeilen.push({ name: norm(name.join(' ')), an: RE_FZEIT.test(anT) ? anT : '', halt: halt, ab: RE_FZEIT.test(abT) ? abT : '',
+                    bem: norm(bemT.replace(/Bfpl\s+\d{4}\s+S\.\s*\d+\s+Sp\.\s*2[a-d]/, '')), ref: r ? { heft: r[1], seite: Number(r[2]), spalte: r[3] } : null, seite: l.seite });
+  }
+  ende();
+  F.zuege.forEach(function (Z) {
+    var d, re = /(\d{2})\.(\d{2})\.(\d{4})/g;
+    while ((d = re.exec(Z.tageText))) Z.tage.push(Number(d[3] + d[2] + d[1]));
+    var b = /vom (\d{2})\.(\d{2})\.(\d{4}) bis (\d{2})\.(\d{2})\.(\d{4})/.exec(Z.tageText);
+    if (b && !/\bam\b/.test(Z.tageText)) { Z.von = Number(b[3] + b[2] + b[1]); Z.bis = Number(b[6] + b[5] + b[4]); Z.tage = []; }
+    Z.tageText = Z.tageText.replace(/\s*verkehrt$/, '');
+  });
+  return F;
+}
+/* gedruckte Seite im Heft, auf der „von“ steht und „nach“ wenige Betriebsstellen später folgt; null, wenn keine.
+   Bevorzugt: Seiten mit Streckenkopf, dann „von“ möglichst weit oben (Anfang einer Tabelle). */
+async function streckeAb(H, von, nach) {
+  /* von: Name im Heft (genau) oder in der Fplo; nach: die nächsten Fplo-Betriebsstellen */
+  var idx = await H.streckenIndex(), best = null, noetig = Math.min(2, nach.length);
+  idx.forEach(function (e, ei) {
+    /* Namen dieser und der folgenden Seite; getrennte Namen („Münster-Spra=“ „kel Hp“) zusammensetzen */
+    var namen = [];
+    e.namen.concat(idx[ei + 1] ? idx[ei + 1].namen : []).forEach(function (n) {
+      var l = namen.length ? namen[namen.length - 1] : '';
+      if (/=$/.test(l)) namen[namen.length - 1] = l.slice(0, -1) + n; else namen.push(n);
+    });
+    for (var i = 0; i < e.namen.length; i++) {
+      if (aehnlich(von, namen[i]) < 3) continue;
+      /* die nächsten Fplo-Betriebsstellen müssen in dieser Reihenfolge folgen (sonst Gegenrichtung) */
+      var k = 0, treffer = 0;
+      for (var j = i + 1; j < namen.length && j <= i + 10 && k < nach.length; j++) {
+        for (var q = k; q < nach.length; q++) if (aehnlich(nach[q], namen[j]) >= 1.6) { treffer++; k = q + 1; break; }
+      }
+      if (treffer < noetig) continue;
+      var wert = (e.strecke ? 0 : 10) + i - 5 * treffer;
+      if (!best || wert < best.wert) best = { nr: e.nr, wert: wert };
+    }
+  });
+  return best ? best.nr : null;
+}
+/* fährt der Zug laut Fplo an diesem Tag (JJJJMMTT)? null = unklar */
+function fploFaehrt(Z, tag) {
+  if (Z.tage.length) return Z.tage.indexOf(tag) >= 0;
+  if (Z.von !== null) return tag >= Z.von && tag <= Z.bis ? null : false;
+  return null;
+}
+
+/* Fahrplan eines Fplo-Zugs aus den Heften bauen.
+   hefte(nr) → Promise eines heftZugriff oder null; tag: JJJJMMTT. Ergebnis wie parse(). */
+async function bauePlanAusFplo(F, Z, tag, hefte, fortschritt) {
+  var warnungen = [], fehlend = [];
+  function warn(t, seite) { warnungen.push({ text: t, seite: seite }); }
+  var reihen = Z.zeilen, starts = [];
+  reihen.forEach(function (r, i) { if (r.ref) starts.push(i); });
+  if (!starts.length) return { fehler: 'Die Fplo verweist bei Zug ' + Z.zug + ' auf kein Fahrplanheft (Bfpl … S. … Sp. …).' };
+  if (starts[0] > 0) warn('Die ersten ' + starts[0] + ' Betriebsstellen der Fplo haben keinen Heftverweis und fehlen', 0);
+  /* Kandidaten für Betriebsstellen: benannte Einträge, aber keine Signale („Esig Münster (W) Hbf“) */
+  function name(E) { if (!E.lines.length || E.info || E.nurKm || E.nurV) return ''; var n = eintragName(E); return RE_KEINNAME.test(n) ? '' : n; }
+  var gesamt = [], seitenZahl = 0, info = [];
+  var aufgaben = starts.map(function (st, s) {
+    var bis = s + 1 < starts.length ? starts[s + 1] : reihen.length;
+    return { ref: reihen[st].ref, R: reihen.slice(st, bis), naechste: s + 1 < starts.length ? reihen[starts[s + 1]].name : null, nachR: reihen[bis] || null };
+  });
+  for (var s = 0; s < aufgaben.length; s++) {
+    var A = aufgaben[s], ref = A.ref, R = A.R, r0 = R[0], naechste = A.naechste;
+    if (fortschritt) fortschritt(s + 1, aufgaben.length, ref);
+    var H = await hefte(ref.heft);
+    if (!H) { if (fehlend.indexOf(ref.heft) < 0) fehlend.push(ref.heft); continue; }
+    /* Heftseiten ab der genannten. Eine Seite trägt oft mehrere Tabellen: endet die eigene mit „Fortsetzung
+       Seite N“, geht es auf Seite N beim „Forts. …“-Kopf weiter, dessen erste Betriebsstelle die zuletzt gelesene
+       wiederholt; was dazwischen steht, gehört zu anderen Wegen. Schluss, wenn eine neue Strecke beginnt oder
+       das Ziel des Abschnitts gelesen ist. */
+    var S = [], ziel = naechste || R[R.length - 1].name, gefunden = 0, aktiv = true, sprung = null, letzter = '', p = ref.seite, n = 0;
+    while (n++ < 60) {
+      var pg = await H.seite(p);
+      if (!pg) break;
+      var B = ersatzBlattseite(pg, ref.spalte, pg.pdfSeite);
+      if (!B) { if (S.length) break; p++; continue; }
+      if (S.length && B.strecke && aktiv) break;
+      var rows = zeilenVon(B.items, 2.5), behalten = [];
+      rows.forEach(function (r) { r.t3 = norm(r.its.filter(function (i) { return i.x > 85 && i.x < 160; }).map(function (i) { return i.s; }).join(' ')); });
+      /* erste Seite: in der Tabelle beginnen, die die Startbetriebsstelle enthält (eine Seite trägt oft mehrere) */
+      var abZeile = 0;
+      if (!S.length) {
+        var bz = -1, bp = 0;
+        rows.forEach(function (r, i) {
+          if (!r.t3) return;
+          var sc = Math.max(aehnlich(r0.name, r.t3), rows[i + 1] ? aehnlich(r0.name, r.t3.replace(/=$/, '') + (/=$/.test(r.t3) ? '' : ' ') + rows[i + 1].t3) : 0);
+          if (sc > bp) { bp = sc; bz = i; }
+        });
+        if (bz >= 0 && bp >= 1.5) {
+          for (abZeile = bz; abZeile > 0; abZeile--) if (/^Forts\.\s/.test(rows[abZeile].t3) || /^Fortsetzung\s/.test(rows[abZeile - 1].t3)) break;
+        }
+      }
+      for (var ri = abZeile; ri < rows.length; ri++) {
+        var r = rows[ri], t = r.t3, fm;
+        if (!aktiv) {
+          if (!/^Forts\.\s/.test(t)) continue;
+          var folgt = '';
+          for (var q = ri + 1; q < rows.length && q < ri + 4 && !folgt; q++) if (rows[q].t3 && !RE_INFO.test(rows[q].t3)) folgt = rows[q].t3;
+          if (letzter && !(aehnlich(letzter, folgt) >= 3)) continue;
+          aktiv = true; sprung = null;
+          if (!/^Forts\. (Regelweg|Alternativweg)\b/.test(t)) r.its.forEach(function (i) { if (i.x > 85 && i.x < 160) i.s = i === r.its.filter(function (j) { return j.x > 85 && j.x < 160; })[0] ? 'Forts. Regelweg' : ''; });
+        }
+        if ((fm = /^Fortsetzung\s+(?:Seite|S\.)\s*(\d+)/.exec(t))) { aktiv = false; sprung = Number(fm[1]); continue; }
+        /* erste Zeile des Abschnitts: ein „Forts.“-Kopf trägt hier die geltende Geschwindigkeit, keinen Übertrag */
+        if (!S.length && !behalten.length && /^Forts\.\s/.test(t)) r.its.forEach(function (i) { if (i.x > 85 && i.x < 160) i.s = ''; });
+        if (t && !RE_INFO.test(t) && !RE_KEINNAME.test(t) && !/^Forts\.\s/.test(t)) letzter = t;
+        r.its.forEach(function (i) { if (i.s) behalten.push(i); });
+      }
+      if (behalten.length) {
+        B.items = behalten; S.push(B);
+        if (gefunden) { gefunden++; if (gefunden > 1 && aktiv) break; }
+        else if (behalten.some(function (i) { return i.x > 85 && i.x < 160 && aehnlich(ziel, i.s) >= 3; })) gefunden = 1;
+      }
+      p = !aktiv && sprung !== null && sprung !== p ? sprung : p + 1;
+    }
+    if (!S.length) { warn('Heft ' + ref.heft + ' Seite ' + ref.seite + ': keine Fahrplantabelle gefunden', ref.seite); continue; }
+    seitenZahl += S.length;
+    S.forEach(function (b) { var z = zeilenAus(b); b.zeilen = z.zeilen; b.noten = z.fuss; });
+    var wSeg = [], bloecke = leseBloecke(S, function (t, sn) { wSeg.push({ text: 'Heft ' + ref.heft + ': ' + t, seite: sn }); });
+    var zp = {};
+    S.forEach(function (b) { b.zeitpunkte.forEach(function (n) { zp[kompakt(n)] = true; }); });
+    /* Fplo-Zeilen der Reihe nach den Betriebsstellen im Heft zuordnen; der Block mit den meisten Treffern gilt */
+    /* Zuordnung mit größter Summe der Ähnlichkeiten bei gleicher Reihenfolge (die erste Fplo-Zeile zählt doppelt) */
+    var bester = null;
+    bloecke.forEach(function (Bk) {
+      var E = Bk.zeilen, kand = [];
+      E.forEach(function (e, i) { var nm = name(e); if (nm) kand.push({ i: i, nm: nm, zp: !!zp[kompakt(nm)] }); });
+      var m = R.length, nk = kand.length, dp = [], wahl = [];
+      for (var a = 0; a <= m; a++) { dp.push(new Array(nk + 1).fill(0)); wahl.push(new Array(nk + 1).fill(0)); }
+      for (a = 1; a <= m; a++) for (var b = 1; b <= nk; b++) {
+        var best = dp[a - 1][b], w = 1;
+        if (dp[a][b - 1] > best) { best = dp[a][b - 1]; w = 2; }
+        var sc = aehnlich(R[a - 1].name, kand[b - 1].nm);
+        if (sc && kand[b - 1].zp) sc += 0.5;
+        if (sc >= 1.5 || (a === 1 && sc > 0)) { var mit = dp[a - 1][b - 1] + sc * (a === 1 ? 2 : 1); if (mit > best) { best = mit; w = 3; } }
+        dp[a][b] = best; wahl[a][b] = w;
+      }
+      var treffer = [];
+      for (a = m, b = nk; a > 0 && b > 0;) {
+        if (wahl[a][b] === 3) { treffer.unshift({ r: R[a - 1], i: kand[b - 1].i }); a--; b--; }
+        else if (wahl[a][b] === 2) b--; else a--;
+      }
+      if (!bester || dp[m][nk] > bester.summe) bester = { B: Bk, treffer: treffer, summe: dp[m][nk] };
+    });
+    if (!bester || !bester.treffer.length || bester.treffer[0].r !== r0) {
+      warn('Heft ' + ref.heft + ' S. ' + ref.seite + ': „' + r0.name + '“ nicht gefunden, Abschnitt ausgelassen', ref.seite);
+      continue;
+    }
+    var E = bester.B.zeilen, i0 = bester.treffer[0].i, i1 = bester.treffer[bester.treffer.length - 1].i;
+    /* bis vor die erste Betriebsstelle des nächsten Abschnitts, soweit sie in diesem Heft steht */
+    if (naechste) {
+      for (var j = i1 + 1; j < E.length && j < i1 + 80; j++) { var nmj = name(E[j]); if (nmj && aehnlich(naechste, nmj) >= 2) { i1 = j - 1; break; } }
+    }
+    /* Fplo-Zeilen über das Ende der Strecke hinaus ohne neuen Heftverweis (z. B. Münster → Rheine): im selben Heft
+       die Strecke suchen, die an der zuletzt gefundenen Betriebsstelle beginnt, und dort weiterlesen */
+    var tLetzt = bester.treffer[bester.treffer.length - 1], rest = R.slice(R.indexOf(tLetzt.r) + 1), fort = null;
+    if (rest.length >= 2 && !A.fortsetzung) {
+      /* erst im selben Heft, dann in den anderen, die die Fplo für den Zug nennt */
+      var kandHefte = [ref.heft].concat(Z.hefte.filter(function (h) { return h !== ref.heft; }));
+      for (var kh = 0; kh < kandHefte.length && !fort; kh++) {
+        var HK = kh ? await hefte(kandHefte[kh]) : H;
+        if (!HK) continue;
+        var nrK = await streckeAb(HK, name(bester.B.zeilen[tLetzt.i]) || tLetzt.r.name, rest.slice(0, 3).map(function (r) { return r.name; }));
+        if (nrK) fort = { heft: kandHefte[kh], seite: nrK, spalte: ref.spalte };
+      }
+      if (fort) aufgaben.splice(s + 1, 0, { ref: fort, R: [tLetzt.r].concat(rest), naechste: naechste, nachR: A.nachR, fortsetzung: true });
+    }
+    if (!fort) R.forEach(function (r) {
+      if (!bester.treffer.some(function (t) { return t.r === r; })) warn('„' + r.name + '“ (Fplo) im Heft ' + ref.heft + ' nicht gefunden, Zeit fehlt', ref.seite);
+    });
+    else R.forEach(function (r) {
+      if (rest.indexOf(r) < 0 && !bester.treffer.some(function (t) { return t.r === r; })) warn('„' + r.name + '“ (Fplo) im Heft ' + ref.heft + ' nicht gefunden, Zeit fehlt', ref.seite);
+    });
+    /* Seitenanfänge und Fußnoten sind im Heft anders gesetzt als im Blattfahrplan: diese Meldungen sind hier kein Befund */
+    wSeg.forEach(function (w) { if (!/Seitenanfang|Fußnote \d+ ohne Text/.test(w.text)) warnungen.push(w); });
+    /* Fortsetzung: die erste Betriebsstelle steht schon am Ende des vorigen Abschnitts */
+    if (A.fortsetzung) { i0++; bester.treffer.shift(); }
+    var stueck = E.slice(i0, i1 + 1);
+    /* gültige Geschwindigkeit am Anfang des Abschnitts */
+    if (stueck.length && !stueck[0].v) {
+      for (var k = i0 - 1; k >= 0; k--) if (E[k].v) { stueck[0].v = { v: E[k].v.v, inv: false }; stueck[0].start = true; break; }
+      if (!stueck[0].v) warn('Heft ' + ref.heft + ' S. ' + ref.seite + ': Geschwindigkeit am Abschnittsanfang unbekannt', ref.seite);
+    }
+    bester.treffer.forEach(function (t) {
+      var En = E[t.i];
+      En.an = t.r.an ? { s: t.r.an, halt: t.r.halt } : null;
+      En.ab = t.r.ab ? { s: t.r.ab } : null;
+      if (t.r.halt && !t.r.an) En.anMarke = t.r.halt;
+      if (t.r.bem) En.fn.push('Fplo: ' + t.r.bem);
+    });
+    var kopfE = { lines: ['- Heft ' + ref.heft + ' ab S. ' + ref.seite + ', Spalte ' + ref.spalte + ' -'], kms: [], plus: [], label: null, an: null, ab: null, anMarke: '', v: null, vg: null, vKm: null, vKmNeu: null, strich: false, start: false, hinweis: [], fn: [], tu: null, saege: 0, info: true, seite: ref.seite, tAn: null, tAb: null };
+    gesamt.push(kopfE);
+    stueck.forEach(function (e) { gesamt.push(e); });
+    info.push({ heft: ref.heft, seite: ref.seite, spalte: ref.spalte, zeilen: stueck.length });
+  }
+  if (fehlend.length && !gesamt.length) return { fehler: 'Es fehlen die Fahrplanhefte ' + fehlend.join(', ') + '.', fehlendeHefte: fehlend };
+  if (!gesamt.length) return { fehler: 'Aus der Fplo ließ sich kein Abschnitt in den Heften finden.', warnungen: warnungen };
+  if (fehlend.length) warn('Fahrplanhefte fehlen: ' + fehlend.join(', ') + ' – diese Abschnitte sind nicht enthalten', 0);
+  var dt = String(tag);
+  var kopf = { zeilen: [], zug: Z.zug, gattung: Z.gattung, datum: { j: Number(dt.slice(0, 4)), m: Number(dt.slice(4, 6)), t: Number(dt.slice(6, 8)) }, datumText: dt.slice(6, 8) + '.' + dt.slice(4, 6) + '.' + dt.slice(0, 4),
+    fahrplanVom: 'Fplo ' + F.name + ' (' + Z.abschnitt + ')', strecke: Z.laufweg, tage: Z.tageText, tfz: Z.tfz, last: Z.last, laenge: Z.laenge, mbr: Z.mbr.length ? Z.mbr[0].mbr : '', vmax: Z.vmax, gedruckt: '',
+    wechsel: Z.mbr.slice(1).map(function (w) { return { ab: w.ab, tfz: Z.tfz, last: Z.last, laenge: Z.laenge, mbr: w.mbr }; }) };
+  if (Z.mbr.length && Z.mbr[0].ab) kopf.mbr += ' (ab ' + Z.mbr[0].ab + ')';
+  var regel = { typ: 'regel', name: 'Regelweg', eltern: null, seite: info[0].seite, zeilen: gesamt, hist: [], aktuell: null, vor: null, offen: null, letztesEv: null, strich: false, v: null, beendet: false, ziel: null, nach: '' };
+  var z = nachbearbeiten([regel], kopf, warn);
+  return { kopf: kopf, regel: regel, alternativen: [], blattseiten: seitenZahl, pdfSeiten: seitenZahl, seiten: [], form: 'Fplo + Ersatzfahrplan', zeiten: z.zeiten, basis: z.basis, warnungen: warnungen, abschnitte: info, fehlendeHefte: fehlend };
+}
+
+var api = { lesePdf: lesePdf, parse: parse, blattseiten: blattseiten, zeilenAus: zeilenAus, eintragName: eintragName,
+            leseText: leseText, leseFplo: leseFplo, fploFaehrt: fploFaehrt, heftZugriff: heftZugriff, ersatzBlattseite: ersatzBlattseite, bauePlanAusFplo: bauePlanAusFplo, aehnlich: aehnlich };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Blattfahrplan = api;
 })(typeof self !== 'undefined' ? self : this);
 
@@ -8570,7 +9035,9 @@ function pdfArt(datei) {
       var stuecke = inhalt.items.map(function (i) { return String(i.str || '').trim(); }), text = stuecke.join(' ');
       var tabelle = stuecke.indexOf('3a') >= 0 && stuecke.indexOf('3b') >= 0;
       doc.destroy();
-      return { art: !tabelle && /La[-\u2010\u2011]\s*Bereich|Übersichtskarte/.test(text) ? 'la' : 'plan', fplo: /Fahrplananordnung|\bFplo\b/i.test(text) };
+      return { art: !tabelle && /La[-\u2010\u2011]\s*Bereich|Übersichtskarte/.test(text) ? 'la'
+        : /Ersatzfahrplan\s+\d{4}/.test(text) && !tabelle ? 'heft'
+        : /\bFplo\s+\S/i.test(text) && /gültig (vom|am)\b/.test(text) ? 'fplo' : 'plan', fplo: /Fahrplananordnung|\bFplo\b/i.test(text) };
     }, function (e) { doc.destroy(); throw e; });
   })['catch'](function () { return { art: 'plan', fplo: false }; });
 }
@@ -8582,11 +9049,18 @@ function pdfArt(datei) {
 function ladeUnbekannt(dateien) {
   dateien = Array.prototype.slice.call(dateien || []);
   if (!dateien.length) return Promise.resolve();
-  var plaene = [], las = [], fplo = {}, alsLaVersucht = {}, notizen = [], planName = null, echteLa = 0;
+  var plaene = [], las = [], fplo = {}, alsLaVersucht = {}, notizen = [], planName = null, echteLa = 0, ablage = [];
   return Promise.all(dateien.map(pdfArt)).then(function (arten) {
-    dateien.forEach(function (d, i) { if (arten[i].fplo) fplo[d.name] = true; (arten[i].art === 'la' ? las : plaene).push(d); });
+    dateien.forEach(function (d, i) {
+      if (arten[i].fplo) fplo[d.name] = true;
+      if (arten[i].art === 'fplo' || arten[i].art === 'heft') ablage.push({ d: d, art: arten[i].art });
+      else (arten[i].art === 'la' ? las : plaene).push(d);
+    });
     echteLa = las.length;
-    var kette = Promise.resolve();
+    /* Fplo und Ersatzfahrpläne kommen in die Ablage auf dem Gerät */
+    var kette = ablage.reduce(function (k, a) {
+      return k.then(function () { return dokAufnehmen(a.d, a.art); }).then(function (t) { notizen.push(t); });
+    }, Promise.resolve());
     plaene.forEach(function (d) {
       kette = kette.then(function () {
         if (planName) { notizen.push('„' + d.name + '“ nicht geladen, es gilt immer nur ein Fahrplan.'); return; }
@@ -8611,15 +9085,194 @@ function ladeUnbekannt(dateien) {
       if (planName && gelesen.length) notizen.unshift('Dazu ' + (gelesen.length === 1 ? 'eine Tages-La' : gelesen.length + ' Tages-La') + ' gelesen, siehe Taste La.');
       var text = notizen.join(' ');
       /* mit Fahrplan zum Bericht; nur La: zum La-Blatt, dort steht, was gelesen wurde */
-      if (!planName && (echteLa || gelesen.length)) {
+      if (!planName && !ablage.length && (echteLa || gelesen.length)) {
         zeigeBlatt('t-la');
         if (text) laMeldung(($('la-meldung').textContent + ' ' + text).trim());
       } else {
         zeigeBlatt('t-zug');
         if (text) autoMeldung(text);
+        if (ablage.length) fploZeige();
       }
     });
   });
+}
+
+/* ---------- Fahrplananordnungen (Fplo) und Ersatzfahrpläne (Efpl-Hefte) ----------
+   Beide bleiben auf dem Gerät (IndexedDB, Speicher „dokumente“), damit sie nur einmal geteilt werden müssen.
+   Eine Fplo wird beim Aufnehmen gelesen und mit ihren Zügen abgelegt; vom Heft nur Nummer und „Gültig ab“.
+   Der Fahrplan eines Zugs entsteht beim Antippen aus Fplo und Heften (Blattfahrplan.bauePlanAusFplo). */
+var dokMeta = [], heftOffen = {}, fploLaeuft = false;
+function dokDb() {
+  return new Promise(function (ok, fehler) {
+    if (!window.indexedDB) { fehler(new Error('kein IndexedDB')); return; }
+    var a = indexedDB.open('fahrplananzeige', 2);
+    a.onupgradeneeded = function () {
+      if (!a.result.objectStoreNames.contains('griffe')) a.result.createObjectStore('griffe');
+      if (!a.result.objectStoreNames.contains('dokumente')) a.result.createObjectStore('dokumente');
+    };
+    a.onsuccess = function () { ok(a.result); };
+    a.onerror = function () { fehler(a.error); };
+  });
+}
+function dokArbeit(modus, tun) {
+  return dokDb().then(function (db) {
+    return new Promise(function (ok, fehler) {
+      var t = db.transaction('dokumente', modus), erg;
+      erg = tun(t.objectStore('dokumente'));
+      t.oncomplete = function () { db.close(); ok(erg && 'result' in erg ? erg.result : undefined); };
+      t.onerror = function () { db.close(); fehler(t.error); };
+      t.onabort = function () { db.close(); fehler(t.error || new Error('abgebrochen')); };
+    });
+  });
+}
+/* Übersicht ohne die PDF-Bytes */
+function dokLaden() {
+  return dokDb().then(function (db) {
+    return new Promise(function (ok) {
+      var liste = [], c = db.transaction('dokumente', 'readonly').objectStore('dokumente').openCursor();
+      c.onsuccess = function () {
+        var z = c.result;
+        if (!z) { db.close(); ok(liste); return; }
+        var v = z.value; liste.push({ schluessel: z.key, art: v.art, nr: v.nr, gueltigAb: v.gueltigAb, gueltigBis: v.gueltigBis, name: v.name, groesse: v.groesse, F: v.F || null });
+        z['continue']();
+      };
+      c.onerror = function () { db.close(); ok(liste); };
+    });
+  })['catch'](function () { return []; }).then(function (l) { dokMeta = l; return l; });
+}
+function dokBytes(schluessel) { return dokArbeit('readonly', function (s) { return s.get(schluessel); }).then(function (v) { return v ? v.bytes : null; }); }
+function dokLoeschen(schluessel) {
+  if (heftOffen[schluessel]) { heftOffen[schluessel].then(function (H) { try { H.doc.destroy(); } catch (e) {} })['catch'](function () {}); delete heftOffen[schluessel]; }
+  return dokArbeit('readwrite', function (s) { s['delete'](schluessel); })['catch'](function () {});
+}
+function tagHeute() { var d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+function tagText(t) { t = String(t); return t.slice(6, 8) + '.' + t.slice(4, 6) + '.' + t.slice(0, 4); }
+function tagIso(t) { t = String(t); return t.slice(0, 4) + '-' + t.slice(4, 6) + '-' + t.slice(6, 8); }
+/* Fplo oder Heft aus einer Datei lesen und ablegen; Rückgabe: Hinweistext */
+function dokAufnehmen(datei, art) {
+  var buf;
+  return holePdfJs().then(function () { return datei.arrayBuffer(); }).then(function (b) {
+    buf = b;
+    return pdfjsLib.getDocument({ data: new Uint8Array(b.slice(0)), disableFontFace: true, verbosity: 0 }).promise;
+  }).then(function (doc) {
+    if (art === 'heft') {
+      return Blattfahrplan.heftZugriff(pdfjsLib, doc).kopf().then(function (k) {
+        doc.destroy();
+        if (!k.nr) return '„' + datei.name + '“: Heftnummer nicht gefunden, nicht gespeichert.';
+        var schl = 'heft:' + k.nr + ':' + (k.gueltigAb || 0);
+        return dokArbeit('readwrite', function (s) {
+          s.put({ art: 'heft', nr: k.nr, gueltigAb: k.gueltigAb, name: datei.name, groesse: buf.byteLength, bytes: buf }, schl);
+        }).then(function () { return 'Ersatzfahrplan ' + k.nr + (k.gueltigAb ? ' (gültig ab ' + tagText(k.gueltigAb) + ')' : '') + ' gespeichert.'; });
+      });
+    }
+    var seiten = [], kette = Promise.resolve();
+    for (var p = 1; p <= doc.numPages; p++) (function (p) {
+      kette = kette.then(function () { return doc.getPage(p); }).then(function (pg) { return Blattfahrplan.leseText(pdfjsLib, pg); }).then(function (s) { seiten.push(s); });
+    })(p);
+    return kette.then(function () {
+      doc.destroy();
+      var F = Blattfahrplan.leseFplo(seiten);
+      if (!F.zuege.length) return 'Fplo ' + (F.name || datei.name) + ' enthält keine Zugfahrpläne (nur Regelungen wie Ausfälle oder zurückzuhaltende Züge). Nicht gespeichert – bitte selbst lesen.';
+      return dokArbeit('readwrite', function (s) {
+        s.put({ art: 'fplo', name: datei.name, gueltigAb: F.gueltigVon, gueltigBis: F.gueltigBis, groesse: buf.byteLength, F: F }, 'fplo:' + (F.name || datei.name));
+      }).then(function () { return 'Fplo ' + (F.name || datei.name) + ' mit ' + F.zuege.length + (F.zuege.length === 1 ? ' Zug' : ' Zügen') + ' gespeichert.'; });
+    });
+  })['catch'](function (e) { return '„' + datei.name + '“ ließ sich nicht speichern' + (e && e.message ? ' (' + e.message + ')' : '') + '.'; });
+}
+/* Heft Nummer nr für den Tag: jüngste Ausgabe, die an dem Tag schon gilt, sonst die jüngste */
+function heftFuer(nr, tag) {
+  var h = dokMeta.filter(function (d) { return d.art === 'heft' && d.nr === nr; }).sort(function (a, b) { return (b.gueltigAb || 0) - (a.gueltigAb || 0); });
+  return h.filter(function (d) { return !d.gueltigAb || d.gueltigAb <= tag; })[0] || h[0] || null;
+}
+function heftOeffnen(meta) {
+  if (!heftOffen[meta.schluessel]) {
+    heftOffen[meta.schluessel] = dokBytes(meta.schluessel).then(function (b) {
+      if (!b) throw new Error('Heft fehlt');
+      return pdfjsLib.getDocument({ data: new Uint8Array(b), disableFontFace: true, verbosity: 0 }).promise;
+    }).then(function (doc) { return Blattfahrplan.heftZugriff(pdfjsLib, doc); });
+    heftOffen[meta.schluessel]['catch'](function () { delete heftOffen[meta.schluessel]; });
+  }
+  return heftOffen[meta.schluessel];
+}
+function fploMeldung(text) { var el = $('fplo-meldung'); el.textContent = text || ''; el.hidden = !text; }
+/* benötigte Hefte eines Zugs: aus den Verweisen und der Liste „Bfpl …“ */
+function fploHefte(Z) {
+  var n = [];
+  Z.zeilen.forEach(function (r) { if (r.ref && n.indexOf(r.ref.heft) < 0) n.push(r.ref.heft); });
+  return n;
+}
+/* nächster Verkehrstag ab heute laut Fplo, sonst null */
+function fploNaechsterTag(Z, ab) {
+  if (Z.tage.length) return Z.tage.filter(function (t) { return t >= ab; }).sort()[0] || null;
+  if (Z.von !== null) return ab <= Z.bis ? Math.max(ab, Z.von) : null;
+  return null;
+}
+function fploZeige() {
+  return dokLaden().then(function (liste) {
+    var heute = tagHeute();
+    /* abgelaufene Fplo entfernen */
+    var alt = liste.filter(function (d) { return d.art === 'fplo' && d.gueltigBis && d.gueltigBis < heute; });
+    if (alt.length) return Promise.all(alt.map(function (d) { return dokLoeschen(d.schluessel); })).then(fploZeige);
+    var fplos = liste.filter(function (d) { return d.art === 'fplo' && d.F; }), hefte = liste.filter(function (d) { return d.art === 'heft'; });
+    $('fplo-ablage-titel').textContent = 'Gespeichert: ' + fplos.length + ' Fplo, ' + hefte.length + (hefte.length === 1 ? ' Ersatzfahrplan' : ' Ersatzfahrpläne');
+    $('fplo-dok').innerHTML = fplos.concat(hefte).map(function (d) {
+      var t = d.art === 'fplo' ? 'Fplo ' + (d.F.name || d.name) + (d.gueltigBis ? ' · bis ' + tagText(d.gueltigBis) : '') + ' · ' + d.F.zuege.length + ' Züge'
+        : 'Ersatzfahrplan ' + d.nr + (d.gueltigAb ? ' · ab ' + tagText(d.gueltigAb) : '') + ' · ' + Math.round(d.groesse / 1e5) / 10 + ' MB';
+      return '<li><span>' + esc(t) + '</span><button class="knopf" type="button" data-dokweg="' + esc(d.schluessel) + '">Entfernen</button></li>';
+    }).join('') || '<li><span>Noch nichts gespeichert.</span></li>';
+    if (!$('fplo-datum').value) $('fplo-datum').value = tagIso(heute);
+    var tag = Number(($('fplo-datum').value || tagIso(heute)).replace(/-/g, '')), such = $('fplo-zug').value.trim();
+    var zeilen = [];
+    fplos.forEach(function (d) {
+      d.F.zuege.forEach(function (Z, ai) {
+        if (such && Z.zug.indexOf(such) !== 0) return;
+        var faehrt = Blattfahrplan.fploFaehrt(Z, tag);
+        if (!such && faehrt === false) return;
+        var fehlt = fploHefte(Z).filter(function (n) { return !heftFuer(n, tag); });
+        zeilen.push({ d: d, Z: Z, ai: ai, faehrt: faehrt, fehlt: fehlt });
+      });
+    });
+    zeilen.sort(function (a, b) { return (a.faehrt === false) - (b.faehrt === false) || a.Z.zug.localeCompare(b.Z.zug); });
+    $('fplo-liste').innerHTML = zeilen.slice(0, 60).map(function (z) {
+      var wann = z.faehrt === false ? 'fährt nicht am ' + tagText(tag) + (fploNaechsterTag(z.Z, tag) ? ', wieder am ' + tagText(fploNaechsterTag(z.Z, tag)) : '') : z.faehrt === null ? 'Verkehrstage selbst prüfen: ' + z.Z.tageText : 'fährt am ' + tagText(tag);
+      return '<button class="wahl" type="button" data-fplo="' + esc(z.d.schluessel) + '" data-abschnitt="' + z.ai + '"><b>' + esc(z.Z.gattung + ' ' + z.Z.zug + ' · ' + (z.Z.laufweg || '')) + '</b>'
+        + '<span>' + esc('Fplo ' + (z.d.F.name || z.d.name) + ', ' + z.Z.abschnitt + ' · ' + wann + (z.Z.mbr.length ? ' · Mbr ' + z.Z.mbr[0].mbr : '')) + '</span>'
+        + '<span>' + esc(z.fehlt.length ? 'Es fehlen die Ersatzfahrpläne ' + z.fehlt.join(', ') : 'Ersatzfahrpläne ' + fploHefte(z.Z).join(', ') + ' vorhanden') + '</span></button>';
+    }).join('');
+    if (!fplos.length) fploMeldung(hefte.length ? 'Noch keine Fplo gespeichert. Eine Fplo an die Fahrplananzeige teilen.' : '');
+    else if (!zeilen.length) fploMeldung(such ? 'Kein Zug ' + such + ' in den gespeicherten Fplo.' : 'Am ' + tagText(tag) + ' fährt laut den gespeicherten Fplo kein Zug. Zugnummer eingeben, um alle zu sehen.');
+    else fploMeldung('');
+  });
+}
+function fploBaue(schluessel, ai) {
+  if (fploLaeuft) return;
+  var d = dokMeta.filter(function (x) { return x.schluessel === schluessel; })[0];
+  if (!d || !d.F || !d.F.zuege[ai]) return;
+  var F = d.F, Z = F.zuege[ai], gewaehlt = Number(($('fplo-datum').value || tagIso(tagHeute())).replace(/-/g, ''));
+  var tag = Blattfahrplan.fploFaehrt(Z, gewaehlt) === false ? (fploNaechsterTag(Z, gewaehlt) || Z.tage[0] || Z.von || gewaehlt) : gewaehlt;
+  var fehlt = fploHefte(Z).filter(function (n) { return !heftFuer(n, tag); });
+  if (fehlt.length) { fploMeldung('Für Zug ' + Z.zug + ' fehlen die Ersatzfahrpläne ' + fehlt.join(', ') + '. Bitte aus DiLoc an die Fahrplananzeige teilen.'); return; }
+  fploLaeuft = true;
+  fploMeldung('Baue Zug ' + Z.zug + ' für den ' + tagText(tag) + ' aus Fplo und Ersatzfahrplan …');
+  holePdfJs().then(function () {
+    return Blattfahrplan.bauePlanAusFplo(F, Z, tag, function (nr) {
+      var m = heftFuer(nr, tag);
+      return m ? heftOeffnen(m)['catch'](function () { return null; }) : Promise.resolve(null);
+    }, function (i, n, ref) { fploMeldung('Baue Zug ' + Z.zug + ': Abschnitt ' + i + ' von ' + n + ' (Heft ' + ref.heft + ', S. ' + ref.seite + ') …'); });
+  }).then(function (r) {
+    if (r.fehler) { fploMeldung(r.fehler + (r.fehlendeHefte && r.fehlendeHefte.length ? ' Bitte aus DiLoc an die Fahrplananzeige teilen.' : '')); return; }
+    var p = planAusPdf(r, 'Fplo ' + (F.name || d.name) + ', ' + Z.abschnitt);
+    laDocs = laDocs.filter(function (x) { return x.voll; });
+    nimmPlan(p);
+    pdfDoc = null;
+    speichere();
+    speichereLa();
+    var w = (p.warnungen || []).length;
+    fploMeldung('Zug ' + Z.zug + ' am ' + tagText(tag) + ' gebaut: ' + r.abschnitte.length + ' Heftabschnitte, ' + r.zeiten + ' Zeiten.' + (tag !== gewaehlt ? ' Am ' + tagText(gewaehlt) + ' fährt er laut Fplo nicht.' : ''));
+    meldung('Fahrplan aus Fplo und Ersatzfahrplan. Maßgebend bleiben Fplo und Heft. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' konnte ich nicht sicher zuordnen, siehe Liste unten. ' : '') + laKurz());
+    zeigeBericht();
+  })['catch'](function (e) { fploMeldung('Der Fahrplan ließ sich nicht bauen' + (e && e.message ? ': ' + e.message : '.')); })
+    .then(function () { fploLaeuft = false; });
 }
 
 /* ---------- Als App installieren ----------
@@ -8690,15 +9343,8 @@ function dateiHandhabe() {
     });
   } catch (e) {}
 }
-function griffDb() {
-  return new Promise(function (ok, fehler) {
-    if (!window.indexedDB) { fehler(new Error('kein IndexedDB')); return; }
-    var a = indexedDB.open('fahrplananzeige', 1);
-    a.onupgradeneeded = function () { a.result.createObjectStore('griffe'); };
-    a.onsuccess = function () { ok(a.result); };
-    a.onerror = function () { fehler(a.error); };
-  });
-}
+/* dieselbe Datenbank wie die Fplo-Ablage (Version 2 mit „griffe“ und „dokumente“) */
+function griffDb() { return dokDb(); }
 function griffLegen(wert) {
   return griffDb().then(function (db) {
     return new Promise(function (ok, fehler) {
@@ -9143,6 +9789,13 @@ $('la-datei').addEventListener('change', function () { if (this.files && this.fi
 $('la-weg').addEventListener('click', entferneLa);
 $('auto-ordner').addEventListener('click', ordnerWaehlen);
 $('installieren-knopf').addEventListener('click', installiere);
+$('fplo-zug').addEventListener('input', function () { fploZeige(); });
+$('fplo-datum').addEventListener('change', function () { fploZeige(); });
+$('fplo-liste').addEventListener('click', function (ev) { var b = ev.target.closest('[data-fplo]'); if (b) fploBaue(b.dataset.fplo, Number(b.dataset.abschnitt)); });
+$('fplo-dok').addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-dokweg]'); if (!b) return;
+  dokLoeschen(b.dataset.dokweg).then(fploZeige);
+});
 if (NATIV) {
   $('eire-suche').addEventListener('click', function () { eireSuche(''); });
   $('eire-zug').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); eireSuche(''); } });
@@ -9223,6 +9876,9 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(function (
     return ordnerBereit.then(function () { if (ordnerGriff) return ordnerSchau(true); });
   });
 })();
+
+/* gespeicherte Fplo und Ersatzfahrpläne anzeigen */
+fploZeige()['catch'](function () {});
 
 /* In der Android-App: EIRE-Abschnitt zeigen, was nur im Browser Sinn hat, verbergen */
 (function () {
