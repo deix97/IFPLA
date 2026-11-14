@@ -1,0 +1,52 @@
+name: Android-App
+
+# Baut die Fahrplan-App aus index.html, lib/, symbol/ und android/ und legt die APK
+# als Release ab: https://github.com/deix97/IFPLA/releases/latest/download/fahrplan.apk
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'android/**'
+      - 'index.html'
+      - 'lib/**'
+      - 'symbol/**'
+      - '.github/workflows/android-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v6
+
+      # Gradle 8.14 läuft nur bis Java 24; der Runner bringt inzwischen Java 25 mit
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Prüfen und bauen
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease lintRelease
+
+      - name: Als Release ablegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk ../fahrplan.apk
+          cd ..
+          gh release create "app-${GITHUB_RUN_NUMBER}" fahrplan.apk \
+            --target "$GITHUB_SHA" \
+            --title "Fahrplan-App 1.0.${GITHUB_RUN_NUMBER}" \
+            --notes "Gebaut aus ${GITHUB_REF_NAME} (${GITHUB_SHA::7}). Auf dem Tablet fahrplan.apk herunterladen und öffnen." \
+            --latest

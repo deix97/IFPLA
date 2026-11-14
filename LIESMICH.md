@@ -1,29 +1,108 @@
 # Fahrplan ohne Dateiauswahl
 
-Die Anzeige konnte den Blattfahrplan bisher nur über „PDF auswählen“ aufnehmen. Dazu kommen jetzt
-vier Wege, die ohne Dateiauswahl auskommen, dazu Betrieb ohne Internet.
+Die Anzeige konnte den Blattfahrplan bisher nur über „PDF auswählen“ aufnehmen. Jetzt gibt es eine
+Android-App, die ihn selbst aus EIRE holt, dazu Wege ohne Dateiauswahl im Browser und Betrieb
+ohne Internet.
 
-## Was mit EIRE geht und was nicht
+## Android-App: nur Zugnummer und Datum
 
-**Nicht möglich:** `https://eire.noncd.db.de` direkt aus der Anzeige heraus abrufen. Das ist eine
-fremde Herkunft mit Anmeldung über Cookie; der Browser lässt ein Skript einer anderen Seite dort
-weder anmelden noch lesen (CORS). Das liegt am Browser, nicht an der Anzeige — kein Umbau ändert
-etwas daran, und eine Abkürzung über einen fremden Vermittler hieße, die Zugangsdaten dorthin zu
-geben. Auf dem Anzeigegerät allein bleibt deshalb: **in EIRE anmelden, PDF öffnen, einmal
-antippen — den Rest macht die Anzeige.**
+Die App enthält die Anzeige und meldet sich selbst bei EIRE an. Das darf eine Webseite im Browser
+nicht (CORS), eine App schon.
+
+**Installieren**, einmalig auf dem Tablet:
+
+1. `https://github.com/deix97/IFPLA/releases/latest/download/fahrplan.apk` in Chrome öffnen.
+2. Die heruntergeladene `fahrplan.apk` öffnen. Android fragt einmal, ob Chrome Apps installieren
+   darf — erlauben, dann *Installieren*. Warnt Play Protect vor einer unbekannten App, über
+   *Details* → *Trotzdem installieren* weiter; die App kommt nicht aus dem Play Store.
+   Nötig ist mindestens Android 8.
+3. „Fahrplan“ starten, unter **Zugang zu EIRE** Benutzername und Passwort eintragen, *Speichern*.
+
+**Bei jedem Dienst:** Zugnummer eingeben (Datum steht auf heute), *Fahrpläne suchen*, den
+passenden Fahrplan antippen. Die App zeigt die Liste wie EIRE, getrennt nach Gesamt- und
+Einzelblattfahrplänen. **Welcher gilt, wählst du selbst** — die App nimmt nie von sich aus einen,
+denn Varianten wie *Mbr 65 G* und *altern. Mbr 67 R/P* hängen von Lok und Bremsstellung ab.
+Meldet der Leser keine unsicheren Stellen, springt die App gleich zur Anzeige, sonst bleibt der
+Bericht zum Vergleich mit der PDF offen. Verlangt EIRE ein Einmalkennwort, erscheint ein Feld dafür.
+
+**Zugangsdaten:** Sie liegen verschlüsselt mit einem Schlüssel aus dem Android-Schlüsselspeicher
+und gehen nur an `eire.noncd.db.de`. Sie werden weder gesichert noch auf ein neues Gerät
+übertragen. *Zugang löschen* entfernt sie samt Schlüssel.
+
+**Updates:** Jede Änderung baut GitHub neu (Ablauf `.github/workflows/android-app.yml`); die neue
+`fahrplan.apk` einfach über die alte installieren, Zugang und Einstellungen bleiben. Der
+Signaturschlüssel liegt offen im Repo (`android/fahrplan.keystore`), damit jeder Bau dieselbe
+Unterschrift trägt. Deshalb: **Updates nur von der Release-Seite dieses Repos installieren.**
+
+Außerdem in der App: Teilen und „Öffnen mit“ für PDF, Dateiauswahl für Fahrplan und La, Ortung,
+Bildschirm wach. Die App läuft immer im Vollbild; die Zurück-Geste schließt nur Blätter, nie die Anzeige.
+
+**PDF teilen, z. B. aus DiLoc:** Die Anzeige erkennt an Seite 1, was ankommt: Tages-La (Deckblatt
+„La-Bereich …“), Fahrplananordnung (Fplo), Ersatzfahrplan (Efpl-Heft) oder Blattfahrplan. Findet der
+Fahrplan-Leser keine Tabelle, versucht sie es noch als La. Mehrere PDF auf einmal gehen auch; es gilt
+immer nur ein Fahrplan. Dasselbe gilt für „PDF auswählen“ und „Öffnen mit“, auch im Browser.
+
+## Fahrplananordnung (Fplo) mit Ersatzfahrplan
+
+Eine Fplo nennt je Zug die Betriebsstellen mit Ankunft und Abfahrt und verweist mit „Bfpl 3995 S.400
+Sp. 2d“ ins Ersatzfahrplan-Heft. Aus beidem baut die Anzeige den Fahrplan: Strecke, km, Signale und
+Geschwindigkeit der genannten Spalte (2a–2d, je eine Zugklasse) aus dem Heft, die Zeiten aus der Fplo.
+
+1. **Einmal:** die Ersatzfahrplan-Hefte (z. B. 3993–3996) aus DiLoc an die Fahrplananzeige teilen.
+   Sie bleiben auf dem Gerät, bis du sie entfernst; neue Ausgaben einfach dazuteilen.
+2. **Nur wenn ein Dienst eine Fplo braucht** (Umleitung, Baustelle): die aktuelle Fplo aus DiLoc
+   teilen. Sie gilt **24 Stunden** ab dem Teilen und verschwindet dann von selbst – Fplo ändern sich
+   oft täglich, so bleibt keine veraltete liegen. Ein Neustart der App mitten im Dienst schadet nicht.
+3. Im Blatt *Fahrplan laden* unter *Fahrplananordnung (Fplo) mit Ersatzfahrplan* Datum wählen
+   (steht auf heute), ggf. Zugnummer eingeben, den Zug antippen.
+
+Unter *Gespeichert: …* steht, bis wann eine Fplo da ist; alles lässt sich dort auch einzeln entfernen.
+
+Gibt es zu einem Zug mehrere Fassungen (z. B. 6.3 und 6.4), steht dabei, an welchem Tag er fährt;
+die Anzeige baut immer die zum gewählten Tag. Fehlt ein Heft, sagt sie welches.
+
+Wie gelesen wird:
+* Eine Heftseite trägt oft mehrere Tabellen. Endet die eigene mit „Fortsetzung Seite N“, geht es auf
+  Seite N beim passenden „Forts. …“-Kopf weiter; die Tabellen dazwischen gehören zu anderen Wegen.
+* Fplo und Heft kürzen Betriebsstellen verschieden ab („K-Ehrenf Pbf“ / „Bft K-Ehrenfeld Pbf“). Die
+  Zuordnung sucht die beste Übereinstimmung in der richtigen Reihenfolge.
+* Führt die Fplo über das Ende einer Strecke hinaus, ohne neuen Heftverweis (z. B. Münster → Rheine),
+  sucht die Anzeige im Heft die anschließende Tabelle in Fahrtrichtung, notfalls in den anderen Heften,
+  die die Fplo für den Zug nennt.
+* Jeder Heftabschnitt beginnt in der Anzeige mit einer Zeile „– Heft 3995 ab S. 400, Spalte 2d –“.
+* Betriebsstellen der Fplo, die im Heft nicht zu finden sind, stehen im Bericht unter *Mit der PDF
+  vergleichen*; ihre Zeit fehlt dann in der Anzeige. **Maßgebend bleiben Fplo und Heft.**
+
+**Wie sie mit EIRE spricht** — genau wie die EIRE-Webseite selbst:
+`POST /ui-api/authentication/login` (Benutzername, Passwort, bei Bedarf Einmalkennwort) liefert
+ein Token, dann `GET /ui-api/timetables?trainNumber=…&date=JJJJMMTT` für die Liste und
+`GET /ui-api/timetables/{id}?date=…&pages=&twoPagesOnOne=true|false` für die PDF, jeweils mit
+`Authorization: Bearer`. Ändert DB InfraGO diese Schnittstelle, muss die App nachziehen.
+
+## Im Browser, ohne App
+
+Aus einer Webseite heraus lässt sich EIRE nicht abrufen (siehe oben). Im Browser bleibt deshalb:
+**in EIRE anmelden, PDF herunterladen, einmal antippen — den Rest macht die Anzeige.**
 
 | Weg | Gerät | Handgriff je Dienst |
 | --- | --- | --- |
 | **Teilen** | Android, Anzeige installiert | PDF in EIRE teilen → Fahrplananzeige |
 | **Öffnen mit** | Rechner, Anzeige installiert | PDF doppelklicken bzw. „Öffnen mit“ |
 | **Download-Ordner** | Chrome/Edge am Rechner | nur herunterladen, die Anzeige nimmt sie selbst |
-| **Quelle (JSON/URL)** | überall | keiner, wenn ein Helfer die PDF bereitlegt |
 
-Soll gar nichts mehr angetippt werden, braucht es einen zweiten Rechner, der sich bei EIRE anmeldet
-und die PDF in einen Ordner legt (`werkzeug/quelle.mjs` liefert sie dann an die Anzeige). Der
-Anmeldeteil ist nicht gebaut.
+### Ein Dienst im Browser auf dem Tablet
 
-## Auf dem Android-Tablet installieren
+1. In Chrome `https://eire.noncd.db.de` öffnen und anmelden (nicht im Inkognito-Fenster, sonst
+   merkt Chrome weder Anmeldung noch Passwort).
+2. Zugnummer und Datum eingeben → *Fahrpläne anzeigen* → beim passenden Fahrplan auf das
+   Download-Symbol tippen.
+3. Die heruntergeladene **Datei** teilen: Downloads öffnen (oder in der Meldung von Chrome auf
+   *Öffnen*), PDF lange drücken bzw. Teilen-Symbol → **Fahrplan**.
+
+Die Anzeige öffnet sich und liest den Fahrplan. Teilt man stattdessen die geöffnete Seite, kommt
+nur ein Link an; die Anzeige sagt das dann und nennt den richtigen Weg.
+
+## Browser-Fassung als App installieren
 
 1. In Chrome `https://deix97.github.io/IFPLA/` öffnen.
 2. Oben im Blatt *Fahrplan laden* auf **Als App installieren** tippen, bestätigen.
@@ -47,57 +126,6 @@ daraus. Dateinamen, die mit `la` beginnen, bleiben liegen. Gelesen wird nur; der
 gewählt, bis *Ordner vergessen* gedrückt wird. Chrome und Edge am Rechner können das, Safari und
 Chrome auf Android nicht — dort der Weg über Teilen.
 
-## Quelle: Verzeichnis oder PDF
-
-Unter **Automatisch holen** steht eine Quelle: entweder direkt eine PDF oder ein JSON-Verzeichnis.
-
-```json
-{
-  "stand": "2026-11-13T03:40:00Z",
-  "plan": "pdf/RE4711_2026-11-13.pdf",
-  "la": ["pdf/La-Nord_2026-11-13.pdf"]
-}
-```
-
-Relative Pfade gelten gegen die Quelle. Ändert sich `stand` nicht, wird nichts neu geladen.
-`Beim Start holen` fragt die Quelle beim Öffnen der Anzeige ab, sonst holt `Jetzt holen`.
-
-Über die Adresse geht es ohne Eintippen — praktisch für einen Kiosk-Browser:
-
-| Teil | Wirkung |
-| --- | --- |
-| `?quelle=…` | Quelle setzen und merken |
-| `?auto=1` | beim Start holen (`?auto=0` aus) |
-| `?plan=…` | einmalig diese Fahrplan-PDF holen |
-| `?la=…,…` | einmalig diese La-PDF holen |
-| `?pdfjs=…` | pdf.js aus anderer Ablage als `lib/` |
-
-Aus einem Skript oder Kiosk-Rahmen:
-
-```js
-Automatik.hole();                      // Quelle abfragen
-Automatik.plan('pdf/zug.pdf');         // eine Fahrplan-PDF
-Automatik.la(['pdf/la-nord.pdf']);     // La-PDF
-Automatik.bytes('zug.pdf', bytes);     // schon geholte Bytes (ArrayBuffer/Uint8Array)
-Automatik.verzeichnis({ plan: '…' });  // Verzeichnis von Hand
-Automatik.stand();                     // was gerade geladen ist
-```
-
-## Quelle auf dem eigenen Rechner
-
-`werkzeug/quelle.mjs` liefert Anzeige und PDF-Ordner aus einer Herkunft aus und baut das
-Verzeichnis selbst. Nur Node, keine Pakete:
-
-```bash
-node werkzeug/quelle.mjs --ordner ./pdf
-```
-
-Dann `http://127.0.0.1:8723/?quelle=/fahrplan.json&auto=1` öffnen. Neue PDF in den Ordner legen,
-die Anzeige holt sie beim nächsten Öffnen oder mit `Jetzt holen`. Einteilung nach Dateiname: beginnt er mit `la`, gilt die
-Datei als Tages-La (je Bereich — Nord, Ost, Mitte, Südost, Süd — die jüngste), sonst als
-Blattfahrplan (die jüngste). Eigenes Verzeichnis: `--verzeichnis ./fahrplan.json`.
-Weitere Schalter: `--port`, `--app`, `--lib` (sonst `lib/` im Projekt), `--cors`.
-
 ## Ohne Internet
 
 pdf.js 3.11.174 liegt unter `lib/` (Mozilla, Apache-2.0, Lizenz daneben) und wird von dort
@@ -114,7 +142,8 @@ lässt sich mit `?pdfjs=…` setzen; sie wird gemerkt.
 | `sw.js` | Ablage für den Betrieb ohne Netz, Annahme geteilter PDF |
 | `symbol/` | Symbole der installierten Anzeige |
 | `lib/` | pdf.js 3.11.174 samt Lizenz |
-| `werkzeug/quelle.mjs` | kleiner Server für PDF-Ordner und Verzeichnis |
+| `android/` | Android-App: Hülle um die Anzeige und Zugriff auf EIRE |
+| `.github/workflows/android-app.yml` | baut die App und legt sie als Release ab |
 
 Fahrplan-PDF werden nirgends dauerhaft abgelegt: eine geteilte PDF liegt bis zum Start der Anzeige
 kurz in der Ablage des Dienstarbeiters und wird dann gelöscht, alles Weitere bleibt im Speicher des
