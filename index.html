@@ -319,7 +319,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <details class="aufklapp" id="fplo-ablage">
           <summary id="fplo-ablage-titel">Gespeicherte Fplo und Ersatzfahrpläne</summary>
           <ul class="liste" id="fplo-dok"></ul>
-          <p class="klar">Fplo und die Ersatzfahrpläne (Efpl-Hefte) einmal an die Fahrplananzeige teilen, z. B. aus DiLoc. Sie bleiben auf diesem Gerät, bis du sie entfernst; abgelaufene Fplo verschwinden von selbst. Der Fahrplan entsteht aus beiden: Strecke, km und Geschwindigkeit aus dem Heft, die Zeiten aus der Fplo. Welche Betriebsstellen nicht zugeordnet werden konnten, steht danach im Bericht.</p>
+          <p class="klar">Die Fplo für den Dienst aus DiLoc an die Fahrplananzeige teilen; sie gilt 24 Stunden und verschwindet dann von selbst, denn Fplo ändern sich oft täglich. Die Ersatzfahrpläne (Efpl-Hefte) nur einmal teilen; sie bleiben auf diesem Gerät, bis du sie entfernst. Der Fahrplan entsteht aus beiden: Strecke, km und Geschwindigkeit aus dem Heft, die Zeiten aus der Fplo. Welche Betriebsstellen nicht zugeordnet werden konnten, steht danach im Bericht.</p>
         </details>
       </div>
       <div class="gruppe" id="installieren" hidden>
@@ -9101,7 +9101,7 @@ function ladeUnbekannt(dateien) {
    Beide bleiben auf dem Gerät (IndexedDB, Speicher „dokumente“), damit sie nur einmal geteilt werden müssen.
    Eine Fplo wird beim Aufnehmen gelesen und mit ihren Zügen abgelegt; vom Heft nur Nummer und „Gültig ab“.
    Der Fahrplan eines Zugs entsteht beim Antippen aus Fplo und Heften (Blattfahrplan.bauePlanAusFplo). */
-var dokMeta = [], heftOffen = {}, fploLaeuft = false;
+var dokMeta = [], heftOffen = {}, fploLaeuft = false, FPLO_DAUER = 24 * 3600000;
 function dokDb() {
   return new Promise(function (ok, fehler) {
     if (!window.indexedDB) { fehler(new Error('kein IndexedDB')); return; }
@@ -9133,7 +9133,7 @@ function dokLaden() {
       c.onsuccess = function () {
         var z = c.result;
         if (!z) { db.close(); ok(liste); return; }
-        var v = z.value; liste.push({ schluessel: z.key, art: v.art, nr: v.nr, gueltigAb: v.gueltigAb, gueltigBis: v.gueltigBis, name: v.name, groesse: v.groesse, F: v.F || null });
+        var v = z.value; liste.push({ schluessel: z.key, art: v.art, nr: v.nr, gueltigAb: v.gueltigAb, gueltigBis: v.gueltigBis, name: v.name, groesse: v.groesse, F: v.F || null, gespeichert: v.gespeichert || 0 });
         z['continue']();
       };
       c.onerror = function () { db.close(); ok(liste); };
@@ -9174,8 +9174,8 @@ function dokAufnehmen(datei, art) {
       var F = Blattfahrplan.leseFplo(seiten);
       if (!F.zuege.length) return 'Fplo ' + (F.name || datei.name) + ' enthält keine Zugfahrpläne (nur Regelungen wie Ausfälle oder zurückzuhaltende Züge). Nicht gespeichert – bitte selbst lesen.';
       return dokArbeit('readwrite', function (s) {
-        s.put({ art: 'fplo', name: datei.name, gueltigAb: F.gueltigVon, gueltigBis: F.gueltigBis, groesse: buf.byteLength, F: F }, 'fplo:' + (F.name || datei.name));
-      }).then(function () { return 'Fplo ' + (F.name || datei.name) + ' mit ' + F.zuege.length + (F.zuege.length === 1 ? ' Zug' : ' Zügen') + ' gespeichert.'; });
+        s.put({ art: 'fplo', name: datei.name, gueltigAb: F.gueltigVon, gueltigBis: F.gueltigBis, groesse: buf.byteLength, F: F, gespeichert: Date.now() }, 'fplo:' + (F.name || datei.name));
+      }).then(function () { return 'Fplo ' + (F.name || datei.name) + ' mit ' + F.zuege.length + (F.zuege.length === 1 ? ' Zug' : ' Zügen') + ' übernommen (für 24 Stunden).'; });
     });
   })['catch'](function (e) { return '„' + datei.name + '“ ließ sich nicht speichern' + (e && e.message ? ' (' + e.message + ')' : '') + '.'; });
 }
@@ -9210,13 +9210,14 @@ function fploNaechsterTag(Z, ab) {
 function fploZeige() {
   return dokLaden().then(function (liste) {
     var heute = tagHeute();
-    /* abgelaufene Fplo entfernen */
-    var alt = liste.filter(function (d) { return d.art === 'fplo' && d.gueltigBis && d.gueltigBis < heute; });
+    /* Fplo gelten nur für den Dienst: 24 Stunden nach dem Teilen weg (sie ändern sich oft täglich), abgelaufene sofort */
+    var alt = liste.filter(function (d) { return d.art === 'fplo' && ((d.gueltigBis && d.gueltigBis < heute) || !d.gespeichert || Date.now() - d.gespeichert > FPLO_DAUER); });
     if (alt.length) return Promise.all(alt.map(function (d) { return dokLoeschen(d.schluessel); })).then(fploZeige);
     var fplos = liste.filter(function (d) { return d.art === 'fplo' && d.F; }), hefte = liste.filter(function (d) { return d.art === 'heft'; });
     $('fplo-ablage-titel').textContent = 'Gespeichert: ' + fplos.length + ' Fplo, ' + hefte.length + (hefte.length === 1 ? ' Ersatzfahrplan' : ' Ersatzfahrpläne');
     $('fplo-dok').innerHTML = fplos.concat(hefte).map(function (d) {
-      var t = d.art === 'fplo' ? 'Fplo ' + (d.F.name || d.name) + (d.gueltigBis ? ' · bis ' + tagText(d.gueltigBis) : '') + ' · ' + d.F.zuege.length + ' Züge'
+      var weg = new Date(d.gespeichert + FPLO_DAUER);
+      var t = d.art === 'fplo' ? 'Fplo ' + (d.F.name || d.name) + ' · ' + d.F.zuege.length + ' Züge · da bis ' + weg.toLocaleDateString('de-DE', { weekday: 'short' }) + ' ' + String(weg.getHours()).padStart(2, '0') + ':' + String(weg.getMinutes()).padStart(2, '0')
         : 'Ersatzfahrplan ' + d.nr + (d.gueltigAb ? ' · ab ' + tagText(d.gueltigAb) : '') + ' · ' + Math.round(d.groesse / 1e5) / 10 + ' MB';
       return '<li><span>' + esc(t) + '</span><button class="knopf" type="button" data-dokweg="' + esc(d.schluessel) + '">Entfernen</button></li>';
     }).join('') || '<li><span>Noch nichts gespeichert.</span></li>';
@@ -9239,7 +9240,7 @@ function fploZeige() {
         + '<span>' + esc('Fplo ' + (z.d.F.name || z.d.name) + ', ' + z.Z.abschnitt + ' · ' + wann + (z.Z.mbr.length ? ' · Mbr ' + z.Z.mbr[0].mbr : '')) + '</span>'
         + '<span>' + esc(z.fehlt.length ? 'Es fehlen die Ersatzfahrpläne ' + z.fehlt.join(', ') : 'Ersatzfahrpläne ' + fploHefte(z.Z).join(', ') + ' vorhanden') + '</span></button>';
     }).join('');
-    if (!fplos.length) fploMeldung(hefte.length ? 'Noch keine Fplo gespeichert. Eine Fplo an die Fahrplananzeige teilen.' : '');
+    if (!fplos.length) fploMeldung(hefte.length ? 'Keine Fplo da. Braucht der Dienst eine, die aktuelle Fplo aus DiLoc an die Fahrplananzeige teilen.' : '');
     else if (!zeilen.length) fploMeldung(such ? 'Kein Zug ' + such + ' in den gespeicherten Fplo.' : 'Am ' + tagText(tag) + ' fährt laut den gespeicherten Fplo kein Zug. Zugnummer eingeben, um alle zu sehen.');
     else fploMeldung('');
   });

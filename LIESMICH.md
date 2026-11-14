@@ -48,11 +48,15 @@ Eine Fplo nennt je Zug die Betriebsstellen mit Ankunft und Abfahrt und verweist 
 Sp. 2d“ ins Ersatzfahrplan-Heft. Aus beidem baut die Anzeige den Fahrplan: Strecke, km, Signale und
 Geschwindigkeit der genannten Spalte (2a–2d, je eine Zugklasse) aus dem Heft, die Zeiten aus der Fplo.
 
-1. **Einmal:** die Fplo und die Hefte, die sie nennt (z. B. 3993–3996), aus DiLoc an die
-   Fahrplananzeige teilen. Sie bleiben auf dem Gerät; abgelaufene Fplo verschwinden von selbst.
-   Unter *Gespeichert: …* lässt sich alles einzeln entfernen.
-2. **Je Dienst:** im Blatt *Fahrplan laden* unter *Fahrplananordnung (Fplo) mit Ersatzfahrplan* Datum
-   wählen (steht auf heute), ggf. Zugnummer eingeben, den Zug antippen.
+1. **Einmal:** die Ersatzfahrplan-Hefte (z. B. 3993–3996) aus DiLoc an die Fahrplananzeige teilen.
+   Sie bleiben auf dem Gerät, bis du sie entfernst; neue Ausgaben einfach dazuteilen.
+2. **Nur wenn ein Dienst eine Fplo braucht** (Umleitung, Baustelle): die aktuelle Fplo aus DiLoc
+   teilen. Sie gilt **24 Stunden** ab dem Teilen und verschwindet dann von selbst – Fplo ändern sich
+   oft täglich, so bleibt keine veraltete liegen. Ein Neustart der App mitten im Dienst schadet nicht.
+3. Im Blatt *Fahrplan laden* unter *Fahrplananordnung (Fplo) mit Ersatzfahrplan* Datum wählen
+   (steht auf heute), ggf. Zugnummer eingeben, den Zug antippen.
+
+Unter *Gespeichert: …* steht, bis wann eine Fplo da ist; alles lässt sich dort auch einzeln entfernen.
 
 Gibt es zu einem Zug mehrere Fassungen (z. B. 6.3 und 6.4), steht dabei, an welchem Tag er fährt;
 die Anzeige baut immer die zum gewählten Tag. Fehlt ein Heft, sagt sie welches.
