@@ -36,6 +36,7 @@ Unterschrift trägt. Deshalb: **Updates nur von der Release-Seite dieses Repos i
 
 Außerdem in der App: Teilen und „Öffnen mit“ für PDF, Dateiauswahl für Fahrplan und La, Ortung,
 Bildschirm wach. Die App läuft immer im Vollbild; die Zurück-Geste schließt nur Blätter, nie die Anzeige.
+Die Schrift folgt der Schriftgröße in den Einstellungen des Tablets, von 85 bis 130 %.
 
 **PDF teilen, z. B. aus DiLoc:** Die Anzeige erkennt an Seite 1, was ankommt: Tages-La (Deckblatt
 „La-Bereich …“), Fahrplananordnung (Fplo), Ersatzfahrplan (Efpl-Heft) oder Blattfahrplan. Findet der
@@ -129,9 +130,10 @@ Chrome auf Android nicht — dort der Weg über Teilen.
 ## Ohne Internet
 
 pdf.js 3.11.174 liegt unter `lib/` (Mozilla, Apache-2.0, Lizenz daneben) und wird von dort
-geladen; cdnjs ist nur noch Rückfall. `sw.js` legt Anzeige, Symbole und pdf.js beim ersten Aufruf
-über https ab. Danach startet und liest die Anzeige ohne Netz. Eine andere Herkunft für pdf.js
-lässt sich mit `?pdfjs=…` setzen; sie wird gemerkt.
+geladen; cdnjs ist nur noch Rückfall. Schriften kommen nicht aus dem Netz: die Anzeige nutzt die
+Systemschrift des Geräts, im Fahrplan deren schmale Form. `sw.js` legt Anzeige, Symbole und pdf.js
+beim ersten Aufruf über https ab. Danach startet und liest die Anzeige ohne Netz. Eine andere
+Herkunft für pdf.js lässt sich mit `?pdfjs=…` setzen; sie wird gemerkt.
 
 ## Was wo liegt
 

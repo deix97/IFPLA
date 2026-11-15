@@ -7,6 +7,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -82,10 +83,11 @@ public final class MainActivity extends Activity {
         tresor = new Tresor(this);
         eire = new Eire(Eire.STANDARD_BASIS, WebSettings.getDefaultUserAgent(this) + " FahrplanApp/" + version(), tresor);
 
+        Configuration einstellung = getResources().getConfiguration();
         wurzel = new FrameLayout(this);
-        wurzel.setBackgroundColor(0xFF0C1012);
+        wurzel.setBackgroundColor(grundfarbe(einstellung));
         web = new WebView(this);
-        web.setBackgroundColor(0xFF0C1012);
+        web.setBackgroundColor(grundfarbe(einstellung));
         wurzel.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(wurzel);
 
@@ -96,7 +98,7 @@ public final class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setMediaPlaybackRequiresUserGesture(true);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setTextZoom(100);
+        s.setTextZoom(schriftZoom(einstellung));
         s.setSupportZoom(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
@@ -116,6 +118,27 @@ public final class MainActivity extends Activity {
         super.onNewIntent(absicht);
         setIntent(absicht);
         nimm(absicht);
+    }
+
+    /** Schriftgröße oder Tag/Nacht des Geräts geändert: ohne Neustart übernehmen, der Fahrplan bleibt geladen. */
+    @Override
+    public void onConfigurationChanged(Configuration neu) {
+        super.onConfigurationChanged(neu);
+        wurzel.setBackgroundColor(grundfarbe(neu));
+        if (web != null) {
+            web.setBackgroundColor(grundfarbe(neu));
+            web.getSettings().setTextZoom(schriftZoom(neu));
+        }
+    }
+
+    /** Schriftgröße aus den Einstellungen des Geräts, wie Dynamic Type; Grenzen in {@link Darstellung}. */
+    private static int schriftZoom(Configuration einstellung) {
+        return Darstellung.textZoom(einstellung.fontScale);
+    }
+
+    /** Grund der Seite, bis sie gezeichnet ist: Tag oder Nacht wie das Gerät. */
+    private static int grundfarbe(Configuration einstellung) {
+        return Darstellung.grund((einstellung.uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES);
     }
 
     @Override
