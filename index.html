@@ -2,138 +2,195 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Fahrplan">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#dfe3de">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c1012">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="symbol/192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="symbol/192.png">
 <title>Fahrplananzeige Führerraum</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* Gestaltung nach den Apple Human Interface Guidelines: Inhalt zuerst, Systemschrift mit
+   Textstilen, semantische Farben für Tag und Nacht, Raster in 4/8 px, Touch-Ziele ab 44 px,
+   Material nur für die schwebende Steuerebene (Tastenleiste, Kopf der Blätter).
+   Aufbau wie EBuLa: Kopf, Statuszeile, Fahrplan von unten nach oben (Ortsmarker im unteren
+   Drittel), Statuszeile, Tastenleiste. */
 :root{
-  /* Layout: ein Bildschirm. Kopf, Statuszeile, Fahrplan von unten nach oben
-     (Ortsmarker im unteren Drittel), Statuszeile, Tastenleiste. */
-  --bg:#dfe3de;
-  --panel:#f4f6f1;
-  --ink:#12171a;
-  --ink-soft:#4d585c;
-  --line:#8f9a97;
-  --line-soft:#cdd3ce;
-  --marker:#0a3f9c;
-  --repeat:#f0cf1a;
-  --repeat-ink:#12171a;
-  --la:#d97a00;
-  --la-bg:#fbe6bd;
-  --la-ink:#573000;
-  --key:#273035;
-  --key-ink:#eef1ed;
-  --key-on:#0a3f9c;
-  --marker-soft:rgba(10,63,156,.28);
-  --orig-filter:none; --el-filter:none; --el:1.7rem;
-  --font-display:"IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",Arial,sans-serif;
-  --font-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
-  --c-vz:2.25em; --c-band:1.9em; --c-v:calc(var(--c-vz) + var(--c-band)); --c-km:3.6em; --c-g:1.3em; --c-t:3.7em;
+  /* ---------- Farben, Tag. Komponenten nutzen nur diese Namen. ---------- */
+  --grund:#f2f2f7;                    /* Seite und Blätter */
+  --flaeche:#ffffff;                  /* Fahrplan, Kopf, Karten */
+  --fuellung:rgba(118,118,128,.12);   /* Knöpfe, Tasten */
+  --fuellung-stark:rgba(118,118,128,.24);
+  --text:#1c1c1e;
+  --text-2:#5f5f66;                   /* Nebentext, AA auf allen Flächen */
+  --trenner:#c6c6c8;
+  --trenner-fein:#e3e3e8;
+  --kontur:#8e8e93;                   /* Rand von Eingabefeldern und Schaltern, 3:1 */
+  --akzent:#005ec4;                   /* Ortsmarker, Auswahl, Fokus, Hauptaktion */
+  --akzent-fuellung:#005ec4;
+  --auf-akzent:#ffffff;
+  --akzent-zart:rgba(0,94,196,.1);
+  --akzent-linie:rgba(0,94,196,.3);
+  --warnung:#c25e00;                  /* La */
+  --warnung-grund:#fff1dc;
+  --warnung-text:#7a3e00;
+  --gefahr:#d1001f;                   /* Löschen, Entfernen */
+  --gelb:#ffcc00;                     /* Feld mit der geltenden Geschwindigkeit */
+  --auf-gelb:#000000;
+  --material:rgba(249,249,249,.82);
+  --schatten:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.08);
+  --knauf:#ffffff;                    /* Knopf im Schalter, bei Tag und Nacht weiß */
+  --knauf-schatten:0 2px 4px rgba(0,0,0,.24);
+  --orig-filter:none; --el-filter:none;
   color-scheme:light;
+
+  /* ---------- Schrift: Systemschrift; dichte Spalten in der schmalen Systemschrift ---------- */
+  --schrift:-apple-system,system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --schrift-dicht:"sans-serif-condensed","Roboto Condensed",-apple-system,system-ui,"Segoe UI",Roboto,"Arial Narrow",sans-serif;
+  /* Textstile wie Title 2 … Caption 2, bezogen auf Body = 1rem */
+  --t-titel:1.29rem; --t-titel3:1.18rem; --t-headline:1rem; --t-body:1rem; --t-callout:.94rem;
+  --t-subhead:.88rem; --t-footnote:max(12px,.76rem); --t-caption:max(11px,.71rem); --t-caption2:max(11px,.65rem);
+
+  /* ---------- Raster, Radien, Bewegung ---------- */
+  --a1:4px; --a2:8px; --a3:12px; --a4:16px; --a6:24px;
+  --r-klein:8px; --r:10px; --r-karte:12px; --r-leiste:18px;
+  --ziel:44px;                        /* kleinstes Touch-Ziel */
+  --feder:cubic-bezier(.2,.9,.25,1);  /* schnell, weich auslaufend */
+  --dauer:.26s;
+
+  /* ---------- Spalten des Fahrplans, in em der Fahrplanschrift ---------- */
+  --el:1.7rem;
+  --c-vz:2.25em; --c-band:1.9em; --c-v:calc(var(--c-vz) + var(--c-band)); --c-km:3.6em; --c-g:1.3em; --c-t:3.7em;
+
+  /* ---------- Symbole in der Linienform von SF Symbols, gefärbt über currentColor ---------- */
+  --i-weiter:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 4.5l7.5 7.5L9 19.5' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --i-haken:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4.5 12.5l5 5L19.5 7' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --i-info:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1.25 8.25h2.5V17.5h-2.5zM12 5.6a1.55 1.55 0 1 1 0 3.1 1.55 1.55 0 0 1 0-3.1z'/%3E%3C/svg%3E");
+  --i-achtung:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2.6c.72 0 1.36.38 1.72 1l8.05 14.05c.75 1.32-.2 2.95-1.72 2.95H3.95c-1.52 0-2.47-1.63-1.72-2.95L10.28 3.6c.36-.62 1-1 1.72-1zm-1.1 6.2h2.2l-.35 6h-1.5zM12 16.1a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z'/%3E%3C/svg%3E");
 }
+/* Nacht: dieselben Namen, dunkle Werte. Folgt dem Gerät, außer Tag oder Nacht ist gewählt. */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]):not([data-anzeige="tag"]){
-    --bg:#0c1012; --panel:#141a1d; --ink:#d3d9d5; --ink-soft:#8a9598;
-    --line:#4b575b; --line-soft:#262f33; --marker:#86b4ff;
-    --repeat:#c4a70f; --repeat-ink:#0c1012;
-    --la:#ffa62b; --la-bg:#35260a; --la-ink:#ffd9a0;
-    --key:#1d2427; --key-ink:#d3d9d5; --key-on:#2c5cb4; --marker-soft:rgba(134,180,255,.3); --orig-filter:invert(.9); --el-filter:brightness(.84);
+    --grund:#000000; --flaeche:#1c1c1e; --fuellung:rgba(118,118,128,.24); --fuellung-stark:rgba(118,118,128,.38);
+    --text:#e9e9ee; --text-2:#aeaeb2; --trenner:#3a3a3c; --trenner-fein:#2c2c2e; --kontur:#8e8e93;
+    --akzent:#5aa8ff; --akzent-fuellung:#0a63d6; --auf-akzent:#ffffff; --akzent-zart:rgba(90,168,255,.16); --akzent-linie:rgba(90,168,255,.34);
+    --warnung:#ff9f0a; --warnung-grund:#3a2606; --warnung-text:#ffcf8a; --gefahr:#ff7a70;
+    --gelb:#ffd60a; --auf-gelb:#000000;
+    --material:rgba(28,28,30,.82); --schatten:0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.45);
+    --orig-filter:invert(.9); --el-filter:brightness(.84);
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]:not([data-anzeige="tag"]),
 :root[data-anzeige="nacht"]{
-  --bg:#0c1012; --panel:#141a1d; --ink:#d3d9d5; --ink-soft:#8a9598;
-  --line:#4b575b; --line-soft:#262f33; --marker:#86b4ff;
-  --repeat:#c4a70f; --repeat-ink:#0c1012;
-  --la:#ffa62b; --la-bg:#35260a; --la-ink:#ffd9a0;
-  --key:#1d2427; --key-ink:#d3d9d5; --key-on:#2c5cb4; --marker-soft:rgba(134,180,255,.3); --orig-filter:invert(.9); --el-filter:brightness(.84);
+  --grund:#000000; --flaeche:#1c1c1e; --fuellung:rgba(118,118,128,.24); --fuellung-stark:rgba(118,118,128,.38);
+  --text:#e9e9ee; --text-2:#aeaeb2; --trenner:#3a3a3c; --trenner-fein:#2c2c2e; --kontur:#8e8e93;
+  --akzent:#5aa8ff; --akzent-fuellung:#0a63d6; --auf-akzent:#ffffff; --akzent-zart:rgba(90,168,255,.16); --akzent-linie:rgba(90,168,255,.34);
+  --warnung:#ff9f0a; --warnung-grund:#3a2606; --warnung-text:#ffcf8a; --gefahr:#ff7a70;
+  --gelb:#ffd60a; --auf-gelb:#000000;
+  --material:rgba(28,28,30,.82); --schatten:0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.45);
+  --orig-filter:invert(.9); --el-filter:brightness(.84);
   color-scheme:dark;
 }
+/* Mehr Kontrast, weniger Transparenz: Einstellungen des Geräts */
+@media (prefers-contrast: more){
+  body{--text-2:var(--text);--trenner-fein:var(--trenner);--trenner:var(--kontur)}
+}
+@media (prefers-reduced-transparency: reduce){
+  body{--material:var(--flaeche)}
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  body{--material:var(--flaeche)}
+}
 
+/* ---------- Grundlagen ---------- */
 *{box-sizing:border-box}
 [hidden]{display:none !important}
 html,body{height:100%;margin:0}
-html{font-size:clamp(13px,calc(8px + 1.3vw),19px)}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.25;-webkit-text-size-adjust:100%}
-button{font:inherit;color:inherit}
+/* Die Schrift wächst mit der Breite (geteilter Bildschirm) und folgt der Schriftgröße des Geräts (rem) */
+html{font-size:clamp(.8125rem,calc(.5rem + 1.3vw),1.1875rem);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--grund);color:var(--text);font-family:var(--schrift);font-size:var(--t-body);line-height:1.3;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
 .num{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
+svg{flex:none}
 
-.geraet{height:100%;max-width:64rem;margin:0 auto;padding:0 16px;display:flex;flex-direction:column}
+.geraet{height:100%;max-width:64rem;margin:0 auto;display:flex;flex-direction:column;
+  padding:max(var(--a2),env(safe-area-inset-top)) max(var(--a4),env(safe-area-inset-right)) 0 max(var(--a4),env(safe-area-inset-left))}
 
-.hinweis{font-size:.72rem;color:var(--ink-soft);padding:.35rem 0 .3rem;display:flex;gap:.3rem .5rem;align-items:center;flex-wrap:wrap}
-.chip{font-family:var(--font-display);font-weight:700;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--line);border-radius:2px;padding:.05rem .35rem;color:var(--ink)}
-.chip.achtung{background:var(--la-bg);color:var(--la-ink);border-color:var(--la)}
-.chip[hidden]{display:none}
+/* ---------- Hinweiszeile ---------- */
+.hinweis{display:flex;flex-wrap:wrap;align-items:center;gap:var(--a1) var(--a2);padding:0 0 var(--a2);font-size:var(--t-footnote);color:var(--text-2)}
+.chip{display:inline-flex;align-items:center;gap:var(--a1);min-height:22px;padding:2px var(--a2);border-radius:999px;background:var(--fuellung);color:var(--text);font-size:var(--t-caption);font-weight:600}
+.chip.achtung{background:var(--warnung-grund);color:var(--warnung-text)}
+.chip.achtung::before{content:"";width:1.05em;height:1.05em;flex:none;background:currentColor;-webkit-mask:var(--i-achtung) center/contain no-repeat;mask:var(--i-achtung) center/contain no-repeat}
 
-.kopf{display:grid;grid-template-columns:minmax(max-content,.9fr) minmax(0,1.5fr) minmax(max-content,1.15fr) minmax(max-content,.9fr);border:1px solid var(--line);background:var(--panel)}
-.feld{padding:.25rem .45rem .3rem;border-left:1px solid var(--line);min-width:0}
-.feld:first-child{border-left:0}
-.feld .lbl{display:block;font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
-.feld .wert{display:block;font-family:var(--font-display);font-weight:600;font-size:1.1rem;overflow-wrap:anywhere}
+/* ---------- Kopf: Zug, Laufweg, Datum, Zeit ---------- */
+/* Felder in einer Zeile; reicht die Breite nicht (schmal, große Schrift), brechen Datum und Zeit um.
+   Die Trennlinien sind die 1-px-Lücken zwischen den Feldern, auch nach dem Umbruch. */
+.kopf{display:flex;flex-wrap:wrap;gap:1px;overflow:hidden;background:var(--trenner-fein);border-radius:var(--r-karte)}
+.kopffeld{flex:1 1 auto;min-width:0;padding:var(--a2) var(--a3);background:var(--flaeche)}
+.kopffeld:nth-child(2){flex:999 1 6rem}
+.kopffeld .lbl{display:block;font-size:var(--t-caption2);font-weight:500;color:var(--text-2)}
+.kopffeld .wert{display:block;font-family:var(--schrift-dicht);font-stretch:condensed;font-weight:600;font-size:var(--t-titel3);line-height:1.15;overflow-wrap:anywhere}
 #k-datum,#k-zeit{white-space:nowrap}
-@media (max-width:359px){.feld{padding-left:.3rem;padding-right:.3rem}.feld .wert{font-size:1rem}}
-@media (max-width:359px){:root{--c-band:1.3em}}
 
-.status{display:flex;justify-content:space-between;gap:.2rem .75rem;flex-wrap:wrap;min-height:1.75rem;align-items:center;
-  padding:.2rem .45rem;border:1px solid var(--line);border-top:0;background:var(--panel);
-  font-family:var(--font-display);font-weight:500;font-size:.95rem}
-.status .erm.ist-la{color:var(--la-ink);background:var(--la-bg);padding:0 .3rem;border-left:.3rem solid var(--la)}
-.status .leer{color:var(--ink-soft)}
-.status.unten{border-top:1px solid var(--line)}
-.status .versp{font-weight:700;font-size:1.05rem}
-.statusknopf{border:1px solid var(--line);border-radius:3px;background:var(--bg);font-family:var(--font-display);font-weight:600;font-size:.9rem;padding:.15rem .5rem;cursor:pointer;min-height:1.6rem}
-.statusknopf:focus-visible{outline:2px solid var(--marker);outline-offset:2px}
+/* ---------- Fahrplan: eine Karte aus Statuszeile, Spaltenkopf, Fahrplan, Statuszeile ---------- */
+.status{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--a1) var(--a3);min-height:36px;padding:var(--a1) var(--a3);
+  background:var(--flaeche);font-family:var(--schrift-dicht);font-stretch:condensed;font-weight:600;font-size:var(--t-callout)}
+.status.oben{margin-top:var(--a2);border-radius:var(--r-karte) var(--r-karte) 0 0;border-bottom:1px solid var(--trenner-fein)}
+.status.unten{min-height:var(--ziel);padding-top:0;padding-bottom:0;padding-right:var(--a1);border-top:1px solid var(--trenner-fein);border-radius:0 0 var(--r-karte) var(--r-karte)}
+.status .leer{color:var(--text-2);font-weight:500}
+.status .erm.ist-la{padding:1px var(--a2) 1px calc(var(--a2) + 3px);border-radius:var(--r-klein);background:var(--warnung-grund);color:var(--warnung-text);box-shadow:inset 3px 0 0 var(--warnung)}
+.status .versp{font-weight:700;font-size:var(--t-headline)}
+/* „Blattseite …“ öffnet die Originalseite: Textknopf mit Pfeil */
+.statusknopf{display:inline-flex;align-items:center;gap:2px;min-height:var(--ziel);padding:0 var(--a2);border:0;border-radius:var(--r-klein);background:none;color:var(--akzent);font-weight:600;cursor:pointer}
+.statusknopf::after{content:"";width:.7em;height:.7em;background:currentColor;-webkit-mask:var(--i-weiter) center/contain no-repeat;mask:var(--i-weiter) center/contain no-repeat}
+.statusknopf:active{background:var(--fuellung)}
 
+/* Spaltenkopf: gleiche Spalten wie die Zeilen (Raster in 1rem), kleine Beschriftung darin */
 .spaltenkopf,.z{display:grid;grid-template-columns:var(--c-v) var(--c-km) var(--c-g) minmax(0,1fr) var(--c-t) var(--c-t)}
-.spaltenkopf{border:1px solid var(--line);border-top:0;background:var(--bg);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
-.spaltenkopf div{padding:.15rem .35rem}
+.spaltenkopf{background:var(--flaeche);border-bottom:1px solid var(--trenner-fein);font-size:var(--t-body)}
+.spaltenkopf div{padding:var(--a1) .35rem;font-family:var(--schrift-dicht);font-stretch:condensed;font-size:var(--t-caption2);font-weight:600;color:var(--text-2)}
 .spaltenkopf .r{text-align:right}
+/* wie das Polster rechts in .c.v: Band (1.9em) und .25em, beides in der Fahrplanschrift (1rem) */
+.spaltenkopf .sk-v{padding-right:calc(1.9rem + .27rem)}
 
-.sichtwrap{flex:1;min-height:0;position:relative;border:1px solid var(--line);border-top:0;background:var(--panel)}
-.sicht{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.sicht:focus-visible{outline:2px solid var(--marker);outline-offset:-2px}
+.sichtwrap{flex:1;min-height:0;position:relative;background:var(--flaeche)}
+.sicht{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;font-family:var(--schrift-dicht);font-stretch:condensed}
+.sicht:focus-visible{outline-offset:-2px}
 .bahn{position:relative}
 
-.z{min-height:1.9em;border-top:1px solid var(--line-soft)}
+.z{min-height:1.9em;border-top:1px solid var(--trenner-fein)}
 .c{padding:.18em .35em;display:flex;align-items:center;min-width:0}
-.c.v{flex-direction:column;justify-content:center;align-items:flex-end;position:relative;padding-right:calc(var(--c-band) / 1.08 + .25em);font-family:var(--font-display);font-weight:700;font-size:1.08em;line-height:1.1}
+.c.v{flex-direction:column;justify-content:center;align-items:flex-end;position:relative;padding-right:calc(var(--c-band) / 1.08 + .25em);font-weight:700;font-size:1.08em;line-height:1.1}
 /* Geschwindigkeitslinie: rechts bei der Höchstgeschwindigkeit des Zuges, weiter links bei weniger; Stufe an jedem Wechsel */
-.c.v::after{content:"";position:absolute;top:-1px;bottom:0;width:3px;background:var(--ink);right:calc((1 - var(--vx,1)) * (var(--c-band) / 1.08 - 3px))}
-.z.vstufe .c.v::before{content:"";position:absolute;bottom:-1px;height:3px;background:var(--ink);right:calc((1 - var(--vb,1)) * (var(--c-band) / 1.08 - 3px));width:calc((var(--vb,1) - var(--va,1)) * (var(--c-band) / 1.08 - 3px) + 3px)}
-.c.km{flex-direction:column;justify-content:center;align-items:flex-end;color:var(--ink-soft);font-size:.9em;line-height:1.2}
+.c.v::after{content:"";position:absolute;top:-1px;bottom:0;width:3px;background:var(--text);right:calc((1 - var(--vx,1)) * (var(--c-band) / 1.08 - 3px))}
+.z.vstufe .c.v::before{content:"";position:absolute;bottom:-1px;height:3px;background:var(--text);right:calc((1 - var(--vb,1)) * (var(--c-band) / 1.08 - 3px));width:calc((var(--vb,1) - var(--va,1)) * (var(--c-band) / 1.08 - 3px) + 3px)}
+.c.km{flex-direction:column;justify-content:center;align-items:flex-end;color:var(--text-2);font-size:.9em;line-height:1.2}
 .c.g{padding:0;justify-content:center;position:relative}
-.c.tx{display:block;font-family:var(--font-display);font-size:1.02em;overflow-wrap:anywhere}
-.c.an,.c.ab{justify-content:flex-end;font-size:.9em;border-left:1px solid var(--line-soft);font-family:var(--font-display);font-weight:600}
+.c.tx{display:block;font-size:1.02em;overflow-wrap:anywhere}
+.c.an,.c.ab{justify-content:flex-end;font-size:.9em;font-weight:600;border-left:1px solid var(--trenner-fein)}
 .z.bst .c.tx .t0{font-weight:700;font-size:1.08em}
-.z.info .c.tx{font-weight:600;color:var(--ink-soft)}
-.z.wechsel .c.v{background:linear-gradient(var(--ink),var(--ink)) left bottom / calc(100% - var(--c-band) / 1.08) 2px no-repeat}
-.z.wechsel.strich .c.v{background:repeating-linear-gradient(90deg,var(--ink) 0 5px,transparent 5px 9px) left bottom / calc(100% - var(--c-band) / 1.08) 2px no-repeat}
-.vz.inv,.vg.inv,.kmw.inv{background:var(--ink);color:var(--panel);padding:0 .22em}
+.z.info .c.tx{font-weight:600;color:var(--text-2)}
+.z.wechsel .c.v{background:linear-gradient(var(--text),var(--text)) left bottom / calc(100% - var(--c-band) / 1.08) 2px no-repeat}
+.z.wechsel.strich .c.v{background:repeating-linear-gradient(90deg,var(--text) 0 5px,transparent 5px 9px) left bottom / calc(100% - var(--c-band) / 1.08) 2px no-repeat}
+.vz.inv,.vg.inv,.kmw.inv{background:var(--text);color:var(--flaeche);padding:0 .22em;border-radius:2px}
 .vg{font-size:.8em;font-weight:600}
-.kmw{color:var(--ink)}
+.kmw{color:var(--text)}
 .kmz{font-size:.86em}
 .zl{display:flex;justify-content:space-between;gap:.6em}
 .hw{white-space:nowrap;font-weight:600}
-.fn{display:block;font-size:.82em;color:var(--ink-soft);font-style:italic}
+.fn{display:block;font-size:.82em;color:var(--text-2);font-style:italic}
 .halt{font-weight:700;margin-right:.12em}
-.gg{color:var(--marker)}
-.leerstand{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;padding:1rem;text-align:center;color:var(--ink-soft)}
-.leerstand p{margin:0;font-family:var(--font-display);font-size:1.1rem}
-.osb{display:inline-block;width:1.05em;height:1.05em;line-height:1.05em;border-radius:50%;background:var(--ink);color:var(--panel);text-align:center;font-size:.78em;font-weight:700;vertical-align:.08em}
-.kasten{display:inline-block;border:1.5px solid var(--ink);padding:0 .2em;font-size:.8em;font-weight:700;line-height:1.15;vertical-align:.05em}
+.gg{color:var(--akzent)}
+.osb{display:inline-block;width:1.05em;height:1.05em;line-height:1.05em;border-radius:50%;background:var(--text);color:var(--flaeche);text-align:center;font-size:.78em;font-weight:700;vertical-align:.08em}
+.kasten{display:inline-block;border:1.5px solid var(--text);border-radius:2px;padding:0 .2em;font-size:.8em;font-weight:700;line-height:1.15;vertical-align:.05em}
 .durch{background-image:linear-gradient(to top right,transparent calc(50% - 1px),currentColor calc(50% - 1px),currentColor calc(50% + 1px),transparent calc(50% + 1px))}
-.osb.durch{background-image:linear-gradient(to top right,transparent calc(50% - 1px),var(--panel) calc(50% - 1px),var(--panel) calc(50% + 1px),transparent calc(50% + 1px));background-color:var(--ink)}
+.osb.durch{background-image:linear-gradient(to top right,transparent calc(50% - 1px),var(--flaeche) calc(50% - 1px),var(--flaeche) calc(50% + 1px),transparent calc(50% + 1px));background-color:var(--text)}
 .dreieck{display:inline-block;width:.8em;height:.62em;vertical-align:.02em}
 /* El-Signale: kleines Bild vor der Nennung, Bilddaten folgen */
 .el{display:inline-block;width:var(--el);height:var(--el);margin:1px .28em 1px 0;vertical-align:middle;background:center / contain no-repeat;filter:var(--el-filter)}
@@ -147,98 +204,190 @@ button{font:inherit;color:inherit}
 .el.e6{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABgFBMVEUAAAAAgP////8AgP8AYtG7u7vZ1M1ycnIAAAAgXqINXLEAAADx6uIdHR0iIiJ9jqCBkKClqq5Ba5mAj6AAXcMAbOQkYaM7aJlZeJkAAAB9kKGeparg2dFmZmYUZ7uHlJ/AvbnKzc44ODgiWJRMTExLdqNge5oFcN7AwL/l494AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC0oYi0AAAAgHRSTlMA//////n/rwD//wD/Tk//////////////AP///7b/////X/9h//////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAENy9yEAAAL5SURBVHjatZjrcqMwDEYdGxJKSEghhZLdpNvbXt7/BRcMGAy+yEZm+qPNTM+RLOsbJoS4PA35uJOAT0JOMb2TY1A+pYfA/GAGwQ9kSMh55AcxjPXvL4PhGKb+fXUNYhD8J7aLAhjm/NZQYhsaiY/fg5gv5+/QDfL57HrDDc/QLOofDDmWQZxPOvElQxA+nkHHxzKs54trSBTzlQwbN05dP0MzKPlsYdiwcRo+i5B6aDT878tVnoNnD8r5tr8WGf2BYdCdT521Hy4NHrnUaOrn/LXBOZeU+zvx9YaN/CITbxXPWwwA/iaDbr4jPxMGv/Q23E/+3D5/qnsAbpyt/jJi9RaDjX+J2j+r0ZA655K9/h1jeoO1h8ZeP09TVu3Vp2TpwTZfzpcNTrlkzJ/u/vR8s8GQS5b8oXnPfykeRoM2l2z5M/JfaZyCDI75MPHp0gBKDRe+j8F2/2W+ymDOJdv9LBd8aw+LjYPsr8yfDJBcSiD7u+CvDfpcaoD1/6bUxVBOc1C+f4r7f9HwhWFMb11qkC/Of6/U/Lf+gvzJKVUZumz9/DcYIslwfeOf3sl9DhLP47n/r0Gc/lIIcjaLH5p9zwtsz+6dF/FFyGEWxdOTDobh6BSG15eugeEoaFbII3ziNzg+dUM4TMN0MAz80sg/t3eovUmwHmL3+s/tDpDJUDoYgPUn/Sq7G0D808if5pADDQM/h9UPMqRzg5mfKup3M/jxoYa/S34N5R9hc3gURr6Yb7N+rRgNN6OB8R+RDzVkvkuDZeMg+ZCoX+1gBsD+NrqXU9jGQffXtwdY/nj3MH4x68kHGDznC9+4bfVDDfB88DNs5dsM8PyxTVptcMkfm0GVS27547xxsbb+xO0rL50hql3zx3XjMM7H3AMWX98DFt9i2DBf+8bh1G80eO2vgwGRrzSg8hW55Jk/4FxCm69m45Dup9awKX9AG4d8PuseQvBnhmsVhD8zIM93vXFh6pcNYeqfDOH4vSEk/9h+NxOS3z33D8f9/Q9+YU9j88DIKgAAAABJRU5ErkJggg==)}
 
 /* Grafikspalte: Tunnel, maßgebende Neigung (Sägelinie), La-Abschnitt */
-.z.tu .c.g::before{content:"";position:absolute;top:0;bottom:0;left:22%;width:0;border-left:2px solid var(--ink)}
+.z.tu .c.g::before{content:"";position:absolute;top:0;bottom:0;left:22%;width:0;border-left:2px solid var(--text)}
 .z.tu-a .c.g::before{top:0;bottom:auto;height:50%}
 .z.tu-e .c.g::before{top:auto;bottom:0;height:50%}
-.z.tu-a .c.g::after,.z.tu-e .c.g::after{content:"";position:absolute;left:6%;width:34%;top:50%;border-top:2px solid var(--ink)}
+.z.tu-a .c.g::after,.z.tu-e .c.g::after{content:"";position:absolute;left:6%;width:34%;top:50%;border-top:2px solid var(--text)}
 .saege{position:absolute;top:0;bottom:0;right:8%;width:46%;height:100%}
-.z.im-la .c.g{background:repeating-linear-gradient(135deg,var(--la) 0 3px,transparent 3px 7px)}
-.z.la{background:var(--la-bg);color:var(--la-ink);border-top:1px solid var(--la)}
-.z.la .c.v,.z.la .c.km{color:var(--la-ink)}
+.z.im-la .c.g{background:repeating-linear-gradient(135deg,var(--warnung) 0 3px,transparent 3px 7px)}
+.z.la{background:var(--warnung-grund);color:var(--warnung-text);border-top:1px solid var(--warnung)}
+.z.la .c.v,.z.la .c.km{color:var(--warnung-text)}
 .z.la .c.tx{grid-column:4 / 7;font-size:.98em}
 .la-zus{display:block;font-size:.86em}
-/* Einträge der Tages-La: gefüllt = mit Geschwindigkeit, hell mit Balken = sonstige Besonderheit */
-.z.la.echt{cursor:pointer}
+/* Einträge der Tages-La: gefüllt = mit Geschwindigkeit, hell mit Balken = sonstige Besonderheit,
+   grau mit grauem Balken = gerade nicht in Kraft. Antippen zeigt den ganzen Eintrag. */
+.z.la.echt{cursor:pointer;min-height:var(--ziel)}
+.z.la.echt:active{box-shadow:inset 0 0 0 100vmax var(--fuellung)}
 .z.la.echt .c.km.lang{grid-column:2 / 4}
 .z.la.echt .lak{font-size:.72em;letter-spacing:.04em}
-.z.la.ohne-v{background:var(--panel);box-shadow:inset .3rem 0 0 var(--la)}
+.z.la.ohne-v{background:var(--flaeche);box-shadow:inset .3rem 0 0 var(--warnung)}
 .z.la.ende .c.tx{font-weight:600}
-.z.la.ruht > .c{opacity:.55}
+.z.la.ruht{background:var(--flaeche);color:var(--text-2);box-shadow:inset .3rem 0 0 var(--trenner)}
+.z.la.ruht .c.v,.z.la.ruht .c.km{color:var(--text-2)}
 .z.la.alt .la-inhalt{text-decoration:line-through;text-decoration-thickness:1px}
-.la-str{font-size:.8em;font-weight:600;white-space:nowrap;border:1px solid currentColor;border-radius:2px;padding:0 .25em;margin-left:.1em;vertical-align:.08em}
+.la-str{font-size:.8em;font-weight:600;white-space:nowrap;border:1px solid currentColor;border-radius:4px;padding:0 .25em;margin-left:.1em;vertical-align:.08em}
 .la-gelt{font-weight:600}
 .la-frage{display:block;font-size:.82em;font-style:italic}
-.la-q{display:inline-block;min-width:1.15em;text-align:center;border:1px solid currentColor;border-radius:2px;font-size:.78em;font-weight:700;margin-left:.3em;padding:0 .15em;vertical-align:.08em}
+.la-q{display:inline-block;min-width:1.15em;text-align:center;border:1px solid currentColor;border-radius:4px;font-size:.78em;font-weight:700;margin-left:.3em;padding:0 .15em;vertical-align:.08em}
 
-.marker{position:absolute;left:0;right:0;top:0;height:0;border-top:2px solid var(--marker-soft);pointer-events:none;will-change:transform}
-.marker::after{content:"";position:absolute;left:0;top:-2px;width:calc(var(--c-v) + var(--c-km) + var(--c-g));border-top:2px solid var(--marker)}
-.marker::before{content:"";position:absolute;left:0;top:calc(-.5em - 1px);border-style:solid;border-width:.5em 0 .5em .8em;border-color:transparent transparent transparent var(--marker)}
+/* Ortsmarker: Linie in der Akzentfarbe mit Dreieck am linken Rand */
+.marker{position:absolute;left:0;right:0;top:0;height:0;border-top:2px solid var(--akzent-linie);pointer-events:none;will-change:transform}
+.marker::after{content:"";position:absolute;left:0;top:-2px;width:calc(var(--c-v) + var(--c-km) + var(--c-g));border-top:2px solid var(--akzent)}
+.marker::before{content:"";position:absolute;left:0;top:calc(-.5em - 1px);border-style:solid;border-width:.5em 0 .5em .8em;border-color:transparent transparent transparent var(--akzent)}
 
 /* Feld mit der geltenden Geschwindigkeit; antippen führt nach dem Blättern zurück zum Ortsmarker */
-.wdh{position:absolute;left:0;bottom:0;display:flex;align-items:stretch;z-index:2;margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;text-align:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.wdh:focus-visible{outline:2px solid var(--marker);outline-offset:2px}
-.wdh.weg .feldv{box-shadow:0 0 0 3px var(--marker)}
-.wdh .feldv{min-width:var(--c-v);background:var(--repeat);color:var(--repeat-ink);font-family:var(--font-display);font-weight:700;font-size:1.25em;
-  text-align:right;padding:.15em .3em;border-top:2px solid var(--ink);border-right:3px solid var(--ink)}
+.wdh{position:absolute;left:0;bottom:0;z-index:2;display:flex;align-items:stretch;min-height:var(--ziel);margin:0;padding:0;border:0;background:none;
+  font:inherit;font-family:var(--schrift-dicht);font-stretch:condensed;color:inherit;text-align:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.wdh.weg .feldv{box-shadow:0 0 0 3px var(--akzent)}
+.wdh .feldv{display:flex;align-items:center;justify-content:flex-end;min-width:var(--c-v);padding:0 .3em;background:var(--gelb);color:var(--auf-gelb);
+  font-weight:700;font-size:1.3em;border-top:2px solid var(--text);border-right:3px solid var(--text);border-top-right-radius:var(--r-klein)}
 .wdh .feldv .gg{font-size:.7em;margin-left:.35em;color:inherit}
-.wdh .feldla{background:var(--la-bg);color:var(--la-ink);border:1px solid var(--la);border-left:.3rem solid var(--la);font-family:var(--font-display);font-weight:700;padding:.15em .45em;display:flex;align-items:center}
+.wdh .feldla{display:flex;align-items:center;padding:0 .5em 0 .75em;background:var(--warnung-grund);color:var(--warnung-text);font-weight:700;
+  box-shadow:inset 0 0 0 1px var(--warnung),inset .3rem 0 0 var(--warnung);border-top-right-radius:var(--r-klein)}
 
-.tasten{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:.25rem;padding:.4rem 0 .6rem}
-.taste{min-height:44px;border:1px solid var(--key);border-bottom-width:3px;border-radius:3px;background:var(--key);color:var(--key-ink);
-  font-family:var(--font-display);font-weight:600;font-size:.95rem;cursor:pointer;padding:.2rem 0;min-width:0}
-.taste:active{transform:translateY(1px);border-bottom-width:2px}
-.taste[aria-pressed="true"]{background:var(--key-on);border-color:var(--key-on)}
-.taste:disabled{opacity:.45;cursor:default}
-.taste:focus-visible,.knopf:focus-visible,.wahl:focus-visible{outline:2px solid var(--marker);outline-offset:2px}
-@media (max-width:359px){.tasten{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* Leerer Zustand */
+.leerstand{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--a2);padding:var(--a6);text-align:center}
+.leerstand svg{width:3.5rem;height:3.5rem;margin-bottom:var(--a1);color:var(--text-2)}
+.leerstand .leer-titel{margin:0;font-size:var(--t-titel3);font-weight:700}
+.leerstand .leer-text{margin:0 0 var(--a2);max-width:34ch;font-size:var(--t-subhead);color:var(--text-2)}
 
-.blatt{position:absolute;inset:0;z-index:5;background:var(--panel);overflow:auto;padding:.8rem .9rem 1rem;display:flex;flex-direction:column;gap:.9rem}
-.blatt[hidden]{display:none}
+/* ---------- Tastenleiste: schwebende Steuerebene aus Material ---------- */
+.tasten{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:var(--a1);margin:var(--a2) 0 max(var(--a2),env(safe-area-inset-bottom));padding:var(--a1);
+  border-radius:var(--r-leiste);background:var(--material);-webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8);
+  box-shadow:var(--schatten),inset 0 0 0 .5px var(--trenner)}
+.taste{display:flex;align-items:center;justify-content:center;min-width:0;min-height:var(--ziel);padding:0 2px;border:1px solid transparent;border-radius:calc(var(--r-leiste) - var(--a1));
+  background:var(--fuellung);color:var(--text);font-size:var(--t-callout);font-weight:600;cursor:pointer;transition:transform .12s var(--feder),background-color .12s}
+.taste svg{width:1.15em;height:1.15em}
+.taste:active{transform:scale(.96);background:var(--fuellung-stark)}
+.taste[aria-pressed="true"]{background:var(--akzent-fuellung);color:var(--auf-akzent)}
+.taste:disabled{opacity:.35;cursor:default;transform:none}
+@media (max-width:419px){.tasten{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ---------- Blätter: über dem Fahrplan, Kopf aus Material, Inhalt in Karten ---------- */
+.blatt{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;gap:var(--a4);overflow:auto;overscroll-behavior:contain;
+  padding:0 var(--a4) var(--a6);background:var(--grund);animation:blatt-auf var(--dauer) var(--feder)}
+@keyframes blatt-auf{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .blatt > *{flex-shrink:0}
-.blatt h2{font-family:var(--font-display);font-size:1.2rem;margin:0;text-wrap:balance}
-.blattkopf{display:flex;justify-content:space-between;align-items:center;gap:1rem;position:sticky;top:-.8rem;z-index:2;margin:-.8rem -.9rem 0;padding:.8rem .9rem .5rem;background:var(--panel)}
-.stamm{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.3rem 1rem;margin:0}
-.stamm dt{color:var(--ink-soft)}
-.stamm dd{margin:0;font-weight:600;overflow-wrap:anywhere}
-.gruppe{display:flex;flex-direction:column;gap:.4rem}
-.gruppe .gl{font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
-.reihe{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
-.knopf{min-height:44px;min-width:3.4rem;padding:.3rem .8rem;border:1px solid var(--line);border-radius:3px;background:var(--bg);cursor:pointer;font-family:var(--font-display);font-weight:600}
-.knopf[aria-pressed="true"]{background:var(--key-on);border-color:var(--key-on);color:#fff}
-.knopf:disabled{opacity:.45;cursor:default}
-.dateiknopf{display:inline-flex;align-items:center}
-.dateiknopf input{position:absolute;width:1px;height:1px;opacity:0}
-.dateiknopf:focus-within{outline:2px solid var(--marker);outline-offset:2px}
-.wertgross{font-family:var(--font-display);font-weight:700;font-size:1.3rem;min-width:5rem;text-align:center}
-.klar{font-size:.86rem;color:var(--ink-soft);max-width:65ch;margin:0}
-.meldung{border-left:.3rem solid var(--la);background:var(--la-bg);color:var(--la-ink);padding:.4rem .6rem;font-size:.9rem;max-width:65ch}
-.feld{min-height:44px;flex:1 1 17rem;min-width:8rem;padding:.3rem .5rem;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--ink);font:inherit}
-.feld.eng{flex:0 1 10.5rem}
-.aufklapp summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-family:var(--font-display);font-weight:600}
-.aufklapp[open] summary{margin-bottom:.3rem}
-.meldung[hidden]{display:none}
-.liste{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.15rem}
-.liste li{display:flex;justify-content:space-between;gap:1rem;border-top:1px solid var(--line-soft);padding:.2rem 0}
+.blattkopf{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:var(--a3);min-height:56px;
+  margin:0 calc(-1 * var(--a4));padding:var(--a1) var(--a4);background:var(--material);
+  -webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8);border-bottom:1px solid var(--trenner-fein)}
+.blatt h2{margin:0;font-size:var(--t-titel);font-weight:700;line-height:1.2;text-wrap:balance}
+.blatt > .gruppe,.blatt > .stamm{padding:var(--a3) var(--a4);border-radius:var(--r-karte);background:var(--flaeche)}
+.gruppe{display:flex;flex-direction:column;gap:var(--a2)}
+.gruppe .gruppe{padding:0;background:none}
+.gl{font-size:var(--t-headline);font-weight:600}
+.gruppe .gruppe .gl{font-size:var(--t-subhead);color:var(--text-2)}
+.reihe{display:flex;flex-wrap:wrap;align-items:center;gap:var(--a2)}
+.klar{margin:0;max-width:65ch;font-size:var(--t-footnote);line-height:1.4;color:var(--text-2)}
+.quelle{margin:0;max-width:65ch;font-size:var(--t-caption);color:var(--text-2)}
+.meldung{display:flex;align-items:flex-start;gap:var(--a2);padding:var(--a3);border-radius:var(--r);background:var(--akzent-zart);color:var(--text);font-size:var(--t-subhead)}
+.meldung::before{content:"";flex:none;width:1.2em;height:1.2em;background:var(--akzent);-webkit-mask:var(--i-info) center/contain no-repeat;mask:var(--i-info) center/contain no-repeat}
+
+/* Knöpfe: getönt; Hauptaktion gefüllt; Löschen rot; Schließen als Textknopf */
+.knopf{display:inline-flex;align-items:center;justify-content:center;gap:var(--a2);min-width:var(--ziel);min-height:var(--ziel);padding:0 var(--a4);
+  border:1px solid transparent;border-radius:var(--r);background:var(--fuellung);color:var(--akzent);font-size:var(--t-callout);font-weight:600;text-align:center;cursor:pointer;
+  transition:transform .12s var(--feder),background-color .12s}
+.knopf:active{transform:scale(.97);background:var(--fuellung-stark)}
+.knopf:disabled{opacity:.4;cursor:default;transform:none}
+.knopf svg{width:1.1em;height:1.1em}
+.knopf.haupt,.knopf[aria-pressed="true"]{background:var(--akzent-fuellung);color:var(--auf-akzent)}
+.knopf.weg{color:var(--gefahr)}
+.knopf.zu{margin-right:calc(-1 * var(--a2));padding:0 var(--a2);background:none;font-size:var(--t-headline)}
+.knopf.zu:active{background:var(--fuellung)}
+.dateiknopf{position:relative}
+.dateiknopf input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.dateiknopf:focus-within{outline:2px solid var(--akzent);outline-offset:2px}
+/* Segmente: eine Wahl aus wenigen; die gewählte ist gefüllt */
+.segment{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;width:100%;max-width:30rem;padding:2px;border:1px solid var(--trenner);border-radius:calc(var(--r) + 2px);background:var(--flaeche)}
+.segment .knopf{padding:0 var(--a2);background:none;color:var(--text);font-weight:500}
+.segment .knopf[aria-pressed="true"]{background:var(--akzent-fuellung);color:var(--auf-akzent);font-weight:600}
+/* Stufenschalter für die Verspätung */
+.stepper{display:inline-flex;align-items:stretch;border-radius:var(--r);background:var(--fuellung)}
+.stepper .knopf{background:none}
+.stepper .wertgross{display:flex;align-items:center;justify-content:center;border-left:1px solid var(--trenner);border-right:1px solid var(--trenner)}
+.wertgross{min-width:5rem;padding:0 var(--a2);text-align:center;font-family:var(--schrift-dicht);font-stretch:condensed;font-weight:700;font-size:var(--t-titel3)}
+/* Schalter: an oder aus, der Knopf wandert */
+.knopf.schalter{position:relative;justify-content:space-between;width:100%;max-width:30rem;padding:0;background:none;color:var(--text);font-size:var(--t-body);font-weight:500;text-align:left}
+.knopf.schalter:active{transform:none;background:none}
+.knopf.schalter::after{content:"";flex:none;width:51px;height:31px;border-radius:999px;background:var(--fuellung-stark);box-shadow:inset 0 0 0 1.5px var(--kontur);transition:background-color var(--dauer),box-shadow var(--dauer)}
+.knopf.schalter::before{content:"";position:absolute;right:22px;top:50%;width:27px;height:27px;margin-top:-13.5px;border-radius:50%;background:var(--knauf);
+  box-shadow:var(--knauf-schatten);transition:transform var(--dauer) var(--feder)}
+.knopf.schalter[aria-pressed="true"]{background:none;color:var(--text)}
+.knopf.schalter[aria-pressed="true"]::after{background:var(--akzent-fuellung);box-shadow:none}
+.knopf.schalter[aria-pressed="true"]::before{transform:translateX(20px)}
+
+/* Eingabefelder */
+.eingabe{flex:1 1 17rem;min-width:8rem;min-height:var(--ziel);padding:0 var(--a3);border:1px solid var(--kontur);border-radius:var(--r);background:var(--flaeche);color:var(--text);font-size:var(--t-body)}
+.eingabe.eng{flex:0 1 11rem}
+.eingabe::placeholder{color:var(--text-2);opacity:1}
+.eingabe:focus-visible{outline-offset:1px;border-color:var(--akzent)}
+
+/* Aufklappbare Abschnitte mit Pfeil, der sich beim Öffnen dreht */
+details > summary{display:flex;align-items:center;justify-content:space-between;gap:var(--a2);min-height:var(--ziel);list-style:none;cursor:pointer}
+details > summary::-webkit-details-marker{display:none}
+details > summary::after{content:"";flex:none;width:.75em;height:.75em;background:var(--text-2);-webkit-mask:var(--i-weiter) center/contain no-repeat;mask:var(--i-weiter) center/contain no-repeat;transition:transform var(--dauer) var(--feder)}
+details[open] > summary::after{transform:rotate(90deg)}
+.aufklapp{border-top:1px solid var(--trenner-fein)}
+.aufklapp > summary{font-weight:600}
+.aufklapp[open] > summary{margin-bottom:var(--a1)}
+
+/* Listen */
+.liste{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.liste li{display:flex;justify-content:space-between;align-items:center;gap:var(--a3);min-height:40px;padding:var(--a2) 0;border-top:1px solid var(--trenner-fein)}
+.liste li:first-child{border-top:0}
+.liste li > .knopf{flex:none}
 .liste.umgekehrt{flex-direction:column-reverse}
-.wahl{display:block;width:100%;text-align:left;border:1px solid var(--line);border-left:.3rem solid var(--line);border-radius:3px;background:var(--bg);padding:.45rem .6rem;cursor:pointer;min-height:44px}
-.wahl[aria-current="true"]{border-left-color:var(--key-on);background:var(--panel)}
-.wahl b{font-family:var(--font-display);font-size:1.02rem}
-.wahl span{display:block;font-size:.84rem;color:var(--ink-soft)}
-.wahl.tief{margin-left:1.2rem;width:calc(100% - 1.2rem)}
-.origwrap{overflow:auto;border:1px solid var(--line)}
-.origwrap canvas{display:block;filter:var(--orig-filter)}
-details.gruppe > summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
-details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-offset:2px}
-.liste.halte li span:first-child{flex:1;min-width:0}
-.zt{min-width:3.6em;text-align:right;font-family:var(--font-display);font-weight:600}
-.haltekopf{display:flex;gap:1rem;font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
-.haltekopf span:first-child{flex:1}
-.haltekopf .zt{font-family:inherit;font-weight:400}
+.liste.umgekehrt li{border-top:0;border-bottom:1px solid var(--trenner-fein)}
+.liste.umgekehrt li:first-child{border-bottom:0}
 .liste li.block{display:block}
 .liste li.block span{display:block}
-.quelle{font-size:.74rem;color:var(--ink-soft);max-width:65ch;margin:0}
+.liste li.block span + span{font-size:var(--t-subhead);color:var(--text-2)}
+.liste.halte li span:first-child{flex:1;min-width:0}
+.zt{min-width:3.6rem;text-align:right;font-family:var(--schrift-dicht);font-stretch:condensed;font-weight:600}
+.haltekopf{display:flex;gap:var(--a3);font-size:var(--t-caption);font-weight:600;color:var(--text-2)}
+.haltekopf span:first-child{flex:1}
+.haltekopf .zt{font-family:inherit}
+/* Auswahlzeilen: antippen öffnet oder lädt; Pfeil rechts, die gewählte mit Haken */
+.zeilen{gap:0}
+.wahl{position:relative;display:block;width:100%;min-height:var(--ziel);padding:var(--a2) calc(var(--a4) + .75em) var(--a2) 0;border:0;border-top:1px solid var(--trenner-fein);border-radius:0;background:none;color:var(--text);text-align:left;cursor:pointer}
+.zeilen > .wahl:first-child,.zeilen > .gl + .wahl{border-top:0}
+.zeilen > .gl{padding-top:var(--a2)}
+.wahl::after{content:"";position:absolute;right:0;top:50%;width:.75em;height:.75em;margin-top:-.375em;background:var(--text-2);-webkit-mask:var(--i-weiter) center/contain no-repeat;mask:var(--i-weiter) center/contain no-repeat}
+.wahl:active{background:var(--fuellung)}
+.wahl[aria-current="true"]::after{width:1.1em;height:1.1em;margin-top:-.55em;background:var(--akzent);-webkit-mask-image:var(--i-haken);mask-image:var(--i-haken)}
+.wahl b{display:block;font-weight:600}
+.wahl span{display:block;font-size:var(--t-subhead);color:var(--text-2)}
+.wahl.tief{width:calc(100% - var(--a6));margin-left:var(--a6)}
+/* Wertepaare */
+.stamm{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--a2) var(--a4);margin:0}
+.stamm dt{font-size:var(--t-subhead);color:var(--text-2)}
+.stamm dd{margin:0;font-weight:500;overflow-wrap:anywhere}
 .stamm dd b{font-weight:700}
-.stamm dd{font-weight:500}
+/* Originalseite der PDF */
+.origwrap{overflow:auto;border-radius:var(--r-karte);background:var(--flaeche);box-shadow:inset 0 0 0 1px var(--trenner-fein)}
+.origwrap canvas{display:block;filter:var(--orig-filter)}
+
+/* ---------- Bewegung reduzieren ---------- */
+@media (prefers-reduced-motion: reduce){
+  .blatt{animation:none}
+  .taste,.knopf,details > summary::after,.knopf.schalter::before,.knopf.schalter::after{transition:none}
+  .taste:active,.knopf:active{transform:none}
+}
+
+/* ---------- Kleine Breiten ---------- */
+@media (max-width:359px){
+  :root{--c-band:1.3em}
+  .spaltenkopf .sk-v{padding-right:calc(1.3rem + .27rem)}
+  .kopffeld{padding-left:var(--a2);padding-right:var(--a2)}
+  .kopffeld .wert{font-size:var(--t-headline)}
+}
+
+/* ---------- Erzwungene Farben (Kontrastdesign des Systems) ---------- */
+@media (forced-colors: active){
+  .taste[aria-pressed="true"],.knopf[aria-pressed="true"]{outline:2px solid CanvasText;outline-offset:-4px}
+  .marker::after,.marker{border-top-color:Highlight}
+  .knopf.schalter::after{border:1px solid CanvasText}
+}
 </style>
 </head>
 <body>
@@ -251,16 +400,16 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
   </div>
 
   <header class="kopf">
-    <div class="feld"><span class="lbl">Zug</span><span class="wert num" id="k-zug"></span></div>
-    <div class="feld"><span class="lbl">Laufweg</span><span class="wert" id="k-weg"></span></div>
-    <div class="feld"><span class="lbl">Datum</span><span class="wert num" id="k-datum"></span></div>
-    <div class="feld"><span class="lbl">Zeit</span><span class="wert num" id="k-zeit"></span></div>
+    <div class="kopffeld"><span class="lbl">Zug</span><span class="wert num" id="k-zug"></span></div>
+    <div class="kopffeld"><span class="lbl">Laufweg</span><span class="wert" id="k-weg"></span></div>
+    <div class="kopffeld"><span class="lbl">Datum</span><span class="wert num" id="k-datum"></span></div>
+    <div class="kopffeld"><span class="lbl">Zeit</span><span class="wert num" id="k-zeit"></span></div>
   </header>
 
   <div class="status oben" id="st-oben"></div>
 
   <div class="spaltenkopf" aria-hidden="true">
-    <div class="r">km/h</div><div class="r">km</div><div></div><div>Betriebsstelle, Signal</div><div class="r">An</div><div class="r">Ab</div>
+    <div class="r sk-v">km/h</div><div class="r">km</div><div></div><div>Betriebsstelle, Signal</div><div class="r">An</div><div class="r">Ab</div>
   </div>
 
   <div class="sichtwrap">
@@ -268,8 +417,10 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
       <div class="bahn" id="bahn"></div>
     </div>
     <div class="leerstand" id="leerstand">
-      <p>Kein Fahrplan geladen.</p>
-      <button class="knopf" type="button" id="leer-laden">Fahrplan-PDF laden</button>
+      <svg viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h15l10 10v26a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"/><path d="M28 5v10h10"/><path d="M17 24h14M17 30h14M17 36h8"/></g></svg>
+      <p class="leer-titel">Kein Fahrplan geladen</p>
+      <p class="leer-text">Hol den Fahrplan aus EIRE, bau ihn aus einer Fplo oder wähle die PDF aus.</p>
+      <button class="knopf haupt" type="button" id="leer-laden">Fahrplan laden</button>
     </div>
     <button class="wdh" type="button" id="wdh" aria-label="Zurück zum Ortsmarker">
       <span class="feldv num" id="wdh-v"></span>
@@ -277,31 +428,31 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     </button>
 
     <section class="blatt" id="blatt-zug" role="dialog" aria-labelledby="h-zug" hidden>
-      <div class="blattkopf"><h2 id="h-zug">Fahrplan laden</h2><button class="knopf" type="button" data-zu="t-zug">Schließen</button></div>
+      <div class="blattkopf"><h2 id="h-zug">Fahrplan laden</h2><button class="knopf zu" type="button" data-zu="t-zug">Schließen</button></div>
       <div class="gruppe" id="eire" hidden>
         <span class="gl">Aus EIRE holen</span>
         <div class="reihe">
-          <input class="feld eng" type="text" id="eire-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer">
-          <input class="feld eng" type="date" id="eire-datum" aria-label="Datum">
-          <select class="feld eng" id="eire-ansicht" aria-label="PDF-Ansicht"><option value="1">zweispaltig</option><option value="0">einspaltig</option></select>
-          <button class="knopf" type="button" id="eire-suche">Fahrpläne suchen</button>
+          <input class="eingabe eng" type="text" id="eire-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer">
+          <input class="eingabe eng" type="date" id="eire-datum" aria-label="Datum">
+          <select class="eingabe eng" id="eire-ansicht" aria-label="PDF-Ansicht"><option value="1">zweispaltig</option><option value="0">einspaltig</option></select>
+          <button class="knopf haupt" type="button" id="eire-suche">Fahrpläne suchen</button>
         </div>
         <div class="reihe" id="eire-codereihe" hidden>
-          <input class="feld eng" type="text" id="eire-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="Einmalkennwort" aria-label="Einmalkennwort aus der Authentifizierungs-App">
-          <button class="knopf" type="button" id="eire-code-ok">Mit Code anmelden</button>
+          <input class="eingabe eng" type="text" id="eire-code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="Einmalkennwort" aria-label="Einmalkennwort aus der Authentifizierungs-App">
+          <button class="knopf haupt" type="button" id="eire-code-ok">Mit Code anmelden</button>
         </div>
         <div class="meldung" id="eire-meldung" role="status" hidden></div>
-        <div class="gruppe" id="eire-ergebnis" hidden></div>
+        <div class="gruppe zeilen" id="eire-ergebnis" hidden></div>
         <details class="aufklapp" id="eire-zugang">
           <summary>Zugang zu EIRE</summary>
           <div class="gruppe">
             <div class="reihe">
-              <input class="feld" type="text" id="eire-benutzer" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Benutzername" aria-label="Benutzername für EIRE">
-              <input class="feld" type="password" id="eire-passwort" autocomplete="current-password" placeholder="Passwort" aria-label="Passwort für EIRE">
+              <input class="eingabe" type="text" id="eire-benutzer" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Benutzername" aria-label="Benutzername für EIRE">
+              <input class="eingabe" type="password" id="eire-passwort" autocomplete="current-password" placeholder="Passwort" aria-label="Passwort für EIRE">
             </div>
             <div class="reihe">
-              <button class="knopf" type="button" id="eire-zugang-ok">Speichern</button>
-              <button class="knopf" type="button" id="eire-zugang-weg" hidden>Zugang löschen</button>
+              <button class="knopf haupt" type="button" id="eire-zugang-ok">Speichern</button>
+              <button class="knopf weg" type="button" id="eire-zugang-weg" hidden>Zugang löschen</button>
               <span class="klar" id="eire-zugang-stand"></span>
             </div>
             <p class="klar">Benutzername und Passwort liegen verschlüsselt im Schlüsselspeicher dieses Tablets und gehen nur an eire.noncd.db.de. Welcher Fahrplan gilt, wählst du selbst aus der Liste. <span id="eire-fassung"></span></p>
@@ -311,11 +462,11 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
       <div class="gruppe" id="fplo">
         <span class="gl">Fahrplananordnung (Fplo) mit Ersatzfahrplan</span>
         <div class="reihe">
-          <input class="feld eng" type="text" id="fplo-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer in den Fplo suchen">
-          <input class="feld eng" type="date" id="fplo-datum" aria-label="Verkehrstag">
+          <input class="eingabe eng" type="text" id="fplo-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer in den Fplo suchen">
+          <input class="eingabe eng" type="date" id="fplo-datum" aria-label="Verkehrstag">
         </div>
         <div class="meldung" id="fplo-meldung" role="status" hidden></div>
-        <div class="gruppe" id="fplo-liste"></div>
+        <div class="gruppe zeilen" id="fplo-liste"></div>
         <details class="aufklapp" id="fplo-ablage">
           <summary id="fplo-ablage-titel">Gespeicherte Fplo und Ersatzfahrpläne</summary>
           <ul class="liste" id="fplo-dok"></ul>
@@ -324,14 +475,14 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
       </div>
       <div class="gruppe" id="installieren" hidden>
         <span class="gl">Als App auf diesem Gerät</span>
-        <div class="reihe"><button class="knopf" type="button" id="installieren-knopf">Als App installieren</button></div>
+        <div class="reihe"><button class="knopf haupt" type="button" id="installieren-knopf">Als App installieren</button></div>
         <p class="klar">Danach startet die Anzeige vom Startbildschirm, auch ohne Netz, und steht im Teilen-Menü: PDF in EIRE öffnen, teilen, Fahrplan wählen.</p>
       </div>
       <div class="gruppe">
         <span class="gl">Blattfahrplan aus der EBuLa-Rückfallebene</span>
         <div class="reihe">
-          <label class="knopf dateiknopf" for="datei">PDF auswählen<input type="file" id="datei" accept="application/pdf,.pdf"></label>
-          <button class="knopf" type="button" id="sitzung-weg" hidden>Fahrplan und La löschen</button>
+          <label class="knopf haupt dateiknopf" for="datei">PDF auswählen<input type="file" id="datei" accept="application/pdf,.pdf"></label>
+          <button class="knopf weg" type="button" id="sitzung-weg" hidden>Fahrplan und La löschen</button>
         </div>
         <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden die zweispaltige und die einspaltige Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
       </div>
@@ -339,7 +490,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <span class="gl">Vom Gerät übernehmen</span>
         <div class="reihe" id="auto-ordnerreihe" hidden>
           <button class="knopf" type="button" id="auto-ordner">Ordner wählen</button>
-          <button class="knopf" type="button" id="auto-ordner-weg" hidden>Ordner vergessen</button>
+          <button class="knopf weg" type="button" id="auto-ordner-weg" hidden>Ordner vergessen</button>
           <span class="klar" id="auto-ordnername"></span>
         </div>
         <p class="klar" id="auto-geraet-text">Teilen: die Anzeige einmal zum Startbildschirm hinzufügen, dann steht sie im Teilen-Menü. PDF im Portal öffnen, teilen, Fahrplananzeige wählen — sie liest sie sofort. Ordner: den Ordner wählen, in den die PDF geladen werden; die Anzeige nimmt beim Start und beim Zurückwechseln die jüngste PDF daraus. Dateien, deren Name mit „la“ beginnt, bleiben dabei liegen.</p>
@@ -357,7 +508,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     </section>
 
     <section class="blatt" id="blatt-fsd" role="dialog" aria-labelledby="h-fsd" hidden>
-      <div class="blattkopf"><h2 id="h-fsd">Fahrplanstammdaten</h2><button class="knopf" type="button" data-zu="t-fsd">Schließen</button></div>
+      <div class="blattkopf"><h2 id="h-fsd">Fahrplanstammdaten</h2><button class="knopf zu" type="button" data-zu="t-fsd">Schließen</button></div>
       <dl class="stamm" id="stamm"></dl>
       <div class="gruppe"><span class="gl">Halte, von unten nach oben</span>
         <div class="haltekopf" aria-hidden="true"><span>Betriebsstelle</span><span class="zt">An</span><span class="zt">Ab</span></div>
@@ -367,18 +518,18 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     </section>
 
     <section class="blatt" id="blatt-lw" role="dialog" aria-labelledby="h-lw" hidden>
-      <div class="blattkopf"><h2 id="h-lw">Laufweg</h2><button class="knopf" type="button" data-zu="t-lw">Schließen</button></div>
+      <div class="blattkopf"><h2 id="h-lw">Laufweg</h2><button class="knopf zu" type="button" data-zu="t-lw">Schließen</button></div>
       <p class="klar" id="lw-text"></p>
-      <div class="gruppe" id="lw-liste"></div>
+      <div class="gruppe zeilen" id="lw-liste"></div>
     </section>
 
     <section class="blatt" id="blatt-la" role="dialog" aria-labelledby="h-la" hidden>
-      <div class="blattkopf"><h2 id="h-la">Tages-La</h2><button class="knopf" type="button" data-zu="t-la">Schließen</button></div>
+      <div class="blattkopf"><h2 id="h-la">Tages-La</h2><button class="knopf zu" type="button" data-zu="t-la">Schließen</button></div>
       <div class="gruppe">
         <span class="gl">Tages-La als PDF, ein oder mehrere La-Bereiche</span>
         <div class="reihe">
-          <label class="knopf dateiknopf" for="la-datei">La-PDF auswählen<input type="file" id="la-datei" accept="application/pdf,.pdf" multiple></label>
-          <button class="knopf" type="button" id="la-weg" hidden>La entfernen</button>
+          <label class="knopf haupt dateiknopf" for="la-datei">La-PDF auswählen<input type="file" id="la-datei" accept="application/pdf,.pdf" multiple></label>
+          <button class="knopf weg" type="button" id="la-weg" hidden>La entfernen</button>
         </div>
         <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Eingeordnet wird nach Betriebsstellen und km des geladenen Fahrplans.</p>
       </div>
@@ -394,15 +545,15 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
       </div>
       <div class="gruppe" id="la-offengruppe" hidden>
         <span class="gl">Nicht eingeordnet, selbst prüfen</span>
-        <div class="gruppe" id="la-offen"></div>
+        <div class="gruppe zeilen" id="la-offen"></div>
       </div>
       <details class="gruppe" id="la-allegruppe" hidden>
         <summary class="gl" id="la-alletitel">Eingeordnete Einträge</summary>
-        <div class="gruppe" id="la-alle"></div>
+        <div class="gruppe zeilen" id="la-alle"></div>
       </details>
       <details class="gruppe" id="la-ausgruppe" hidden>
         <summary class="gl" id="la-austitel">Nur Gegengleis, mit GW</summary>
-        <div class="gruppe" id="la-aus"></div>
+        <div class="gruppe zeilen" id="la-aus"></div>
       </details>
       <div class="gruppe" id="la-hinweisgruppe" hidden>
         <span class="gl">Hinweise auf dem Deckblatt</span>
@@ -411,7 +562,7 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     </section>
 
     <section class="blatt" id="blatt-eintrag" role="dialog" aria-labelledby="h-eintrag" hidden>
-      <div class="blattkopf"><h2 id="h-eintrag">La-Eintrag</h2><button class="knopf" type="button" id="e-zu">Schließen</button></div>
+      <div class="blattkopf"><h2 id="h-eintrag">La-Eintrag</h2><button class="knopf zu" type="button" id="e-zu">Schließen</button></div>
       <dl class="stamm" id="e-daten"></dl>
       <p class="klar" id="e-text"></p>
       <div class="origwrap" id="e-wrap"><canvas id="e-bild"></canvas></div>
@@ -420,9 +571,9 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     <section class="blatt" id="blatt-orig" role="dialog" aria-labelledby="h-orig" hidden>
       <div class="blattkopf"><h2 id="h-orig">Blattseite</h2>
         <div class="reihe">
-          <button class="knopf" type="button" id="o-vor" aria-label="Vorige Blattseite">◀</button>
-          <button class="knopf" type="button" id="o-nach" aria-label="Nächste Blattseite">▶</button>
-          <button class="knopf" type="button" data-zu="b-orig">Schließen</button>
+          <button class="knopf" type="button" id="o-vor" aria-label="Vorige Blattseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4.5 7.5 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="knopf" type="button" id="o-nach" aria-label="Nächste Blattseite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.5l7.5 7.5L9 19.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="knopf zu" type="button" data-zu="b-orig">Schließen</button>
         </div>
       </div>
       <p class="klar" id="o-text"></p>
@@ -430,10 +581,10 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     </section>
 
     <section class="blatt" id="blatt-zeit" role="dialog" aria-labelledby="h-zeit" hidden>
-      <div class="blattkopf"><h2 id="h-zeit">Zeit, Ortsmarker, Anzeige</h2><button class="knopf" type="button" data-zu="t-zeit">Schließen</button></div>
+      <div class="blattkopf"><h2 id="h-zeit">Zeit, Ortsmarker, Anzeige</h2><button class="knopf zu" type="button" data-zu="t-zeit">Schließen</button></div>
       <div class="gruppe">
-        <span class="gl">Steuerung des Ortsmarkers</span>
-        <div class="reihe">
+        <span class="gl" id="gl-modus">Steuerung des Ortsmarkers</span>
+        <div class="segment" role="group" aria-labelledby="gl-modus">
           <button class="knopf" type="button" id="m-zeit" aria-pressed="true">Zeit-Automatik</button>
           <button class="knopf" type="button" id="m-hand" aria-pressed="false">Manuell</button>
           <button class="knopf" type="button" id="m-ort" aria-pressed="false">Ortung</button>
@@ -445,23 +596,25 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
         <p class="quelle">Koordinaten der Betriebsstellen: Deutsche Bahn AG, Stationsdaten (aus dem Paket db-stations 5.0.2), und DB Netz AG, Betriebsstellenverzeichnis 10/2021. Beide CC BY 4.0, hier zusammengeführt und gekürzt.</p>
       </div>
       <div class="gruppe">
-        <span class="gl">Verspätung</span>
+        <span class="gl" id="gl-versp">Verspätung</span>
         <div class="reihe">
-          <button class="knopf" type="button" id="v-minus" aria-label="Verspätung um eine Minute verringern">− 1 min</button>
-          <span class="wertgross num" id="v-wert"></span>
-          <button class="knopf" type="button" id="v-plus" aria-label="Verspätung um eine Minute erhöhen">+ 1 min</button>
+          <div class="stepper" role="group" aria-labelledby="gl-versp">
+            <button class="knopf" type="button" id="v-minus" aria-label="Verspätung um eine Minute verringern">− 1 min</button>
+            <span class="wertgross num" id="v-wert"></span>
+            <button class="knopf" type="button" id="v-plus" aria-label="Verspätung um eine Minute erhöhen">+ 1 min</button>
+          </div>
           <button class="knopf" type="button" id="v-null">Auf 0 setzen</button>
           <button class="knopf" type="button" id="t-pause" aria-pressed="false">Marker anhalten</button>
         </div>
         <p class="klar">Mit ▲ und ▼ setzt du den Marker auf die Zeile, an der der Zug gerade ist. Die Verspätung ergibt sich daraus.</p>
       </div>
       <div class="gruppe">
-        <span class="gl">Anzeige</span>
-        <div class="reihe">
+        <span class="gl" id="gl-anzeige">Anzeige</span>
+        <div class="segment" role="group" aria-labelledby="gl-anzeige">
           <button class="knopf" type="button" id="a-tag" aria-pressed="false">Tag</button>
           <button class="knopf" type="button" id="a-nacht" aria-pressed="false">Nacht</button>
-          <button class="knopf" type="button" id="a-wach" aria-pressed="false">Bildschirm anlassen</button>
         </div>
+        <button class="knopf schalter" type="button" id="a-wach" aria-pressed="false">Bildschirm anlassen</button>
         <p class="klar" id="a-wachtext" hidden></p>
       </div>
     </section>
@@ -479,8 +632,8 @@ details.gruppe > summary:focus-visible{outline:2px solid var(--marker);outline-o
     <button class="taste" type="button" id="t-lw" aria-pressed="false">LW</button>
     <button class="taste" type="button" id="t-gw" aria-pressed="false" aria-label="Fahrt auf dem Gegengleis">GW</button>
     <button class="taste" type="button" id="t-la" aria-pressed="false">La</button>
-    <button class="taste" type="button" id="t-ab" aria-label="Marker eine Zeile zurück">▼</button>
-    <button class="taste" type="button" id="t-auf" aria-label="Marker eine Zeile vor">▲</button>
+    <button class="taste" type="button" id="t-ab" aria-label="Marker eine Zeile zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18.5 4.5 7h15z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+    <button class="taste" type="button" id="t-auf" aria-label="Marker eine Zeile vor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5 19.5 17h-15z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
     <button class="taste" type="button" id="t-zeit" aria-pressed="false">Zeit</button>
   </nav>
 </div>
@@ -8388,7 +8541,7 @@ function setzeBlock(idx, neu) {
   /* laufende Ortung: im neuen Abschnitt neu aufsetzen, bei neuem Fahrplan beenden */
   if (ortAn) {
     if (!neu && ortMoeglich()) { ortHalt = modus === 'hand' ? handPos : posAt(sollzeit()); pause = false; ortNeu(); modus = 'ort'; }
-    else { ortStopp(); if (!neu) ortMeldung('Für diesen Abschnitt liegen zu wenige Betriebsstellen mit Koordinaten vor. Die Ortung ist beendet.'); }
+    else { ortStopp(); if (!neu) ortMeldung('Für diesen Abschnitt liegen zu wenige Betriebsstellen mit Koordinaten vor. Die Ortung ist beendet; der Marker läuft wieder nach der Zeit oder von Hand.'); }
   }
   zeichne(); messe(); zeigeModus(); tick();
 }
@@ -8759,7 +8912,7 @@ function maleLaSeite(d, e) {
       ctx.fillRect(bild.width - 9 * sc, e.y[0] * sc, 9 * sc, (e.y[1] - e.y[0]) * sc);
       $('blatt-eintrag').scrollTop = Math.max(0, wrap.offsetTop + e.y[0] * cssW / v1.width - 90);
     });
-  }).catch(function () { if (lauf === laLauf) { wrap.hidden = true; text.textContent = 'Die Seite ließ sich nicht zeichnen.'; } });
+  }).catch(function () { if (lauf === laLauf) { wrap.hidden = true; text.textContent = 'Die Seite ließ sich nicht zeichnen. Lade die La-PDF unter „La“ noch einmal.'; } });
 }
 /* Originalseite der PDF zum Gegenprüfen */
 function maleOrig(nr) {
@@ -8778,7 +8931,7 @@ function maleOrig(nr) {
     bild.width = Math.round(bw * sc); bild.height = Math.round(v1.height * sc); bild.style.width = cssW + 'px';
     var ctx = bild.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, bild.width, bild.height);
     return page.render({ canvasContext: ctx, viewport: page.getViewport({ scale: sc }), transform: [1, 0, 0, 1, zwei && info.x0 > 200 ? -bild.width : 0, 0] }).promise;
-  }).catch(function () { if (lauf === origLauf) { $('o-wrap').hidden = true; text.textContent = 'Die Seite ließ sich nicht zeichnen.'; } });
+  }).catch(function () { if (lauf === origLauf) { $('o-wrap').hidden = true; text.textContent = 'Die Seite ließ sich nicht zeichnen. Lade die PDF über „Zug“ noch einmal.'; } });
 }
 function zeigeModus() {
   if (!plan) return;
@@ -8830,7 +8983,14 @@ function istDunkel() {
   if (th) return th === 'dark';
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
-function zeigeAnzeige() { var dunkel = istDunkel(); $('a-tag').setAttribute('aria-pressed', String(!dunkel)); $('a-nacht').setAttribute('aria-pressed', String(dunkel)); }
+function zeigeAnzeige() {
+  var dunkel = istDunkel();
+  $('a-tag').setAttribute('aria-pressed', String(!dunkel));
+  $('a-nacht').setAttribute('aria-pressed', String(dunkel));
+  /* Systemleiste in der Farbe des Seitengrunds (--grund), auch wenn Tag oder Nacht von Hand gewählt ist */
+  var grund = getComputedStyle(wurzel).getPropertyValue('--grund').trim();
+  if (grund) Array.prototype.forEach.call(document.querySelectorAll('meta[name="theme-color"]'), function (m) { m.setAttribute('content', grund); });
+}
 function setzeAnzeige(neu) {
   wurzel.dataset.anzeige = neu;
   try { localStorage.setItem('fahrplananzeige.anzeige', neu); } catch (e) {}
@@ -9219,7 +9379,7 @@ function fploZeige() {
       var weg = new Date(d.gespeichert + FPLO_DAUER);
       var t = d.art === 'fplo' ? 'Fplo ' + (d.F.name || d.name) + ' · ' + d.F.zuege.length + ' Züge · da bis ' + weg.toLocaleDateString('de-DE', { weekday: 'short' }) + ' ' + String(weg.getHours()).padStart(2, '0') + ':' + String(weg.getMinutes()).padStart(2, '0')
         : 'Ersatzfahrplan ' + d.nr + (d.gueltigAb ? ' · ab ' + tagText(d.gueltigAb) : '') + ' · ' + Math.round(d.groesse / 1e5) / 10 + ' MB';
-      return '<li><span>' + esc(t) + '</span><button class="knopf" type="button" data-dokweg="' + esc(d.schluessel) + '">Entfernen</button></li>';
+      return '<li><span>' + esc(t) + '</span><button class="knopf weg" type="button" data-dokweg="' + esc(d.schluessel) + '">Entfernen</button></li>';
     }).join('') || '<li><span>Noch nichts gespeichert.</span></li>';
     if (!$('fplo-datum').value) $('fplo-datum').value = tagIso(heute);
     var tag = Number(($('fplo-datum').value || tagIso(heute)).replace(/-/g, '')), such = $('fplo-zug').value.trim();
@@ -9272,7 +9432,7 @@ function fploBaue(schluessel, ai) {
     fploMeldung('Zug ' + Z.zug + ' am ' + tagText(tag) + ' gebaut: ' + r.abschnitte.length + ' Heftabschnitte, ' + r.zeiten + ' Zeiten.' + (tag !== gewaehlt ? ' Am ' + tagText(gewaehlt) + ' fährt er laut Fplo nicht.' : ''));
     meldung('Fahrplan aus Fplo und Ersatzfahrplan. Maßgebend bleiben Fplo und Heft. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' konnte ich nicht sicher zuordnen, siehe Liste unten. ' : '') + laKurz());
     zeigeBericht();
-  })['catch'](function (e) { fploMeldung('Der Fahrplan ließ sich nicht bauen' + (e && e.message ? ': ' + e.message : '.')); })
+  })['catch'](function (e) { fploMeldung('Der Fahrplan ließ sich nicht bauen' + (e && e.message ? ': ' + String(e.message).replace(/\.?\s*$/, '.') : '.') + ' Teile Fplo und Ersatzfahrpläne noch einmal aus DiLoc und tippe den Zug erneut an.'); })
     .then(function () { fploLaeuft = false; });
 }
 
@@ -9382,7 +9542,7 @@ function ordnerWaehlen() {
     return griffLegen(g).then(function () { ordnerZeige(); return ordnerSchau(false); });
   })['catch'](function (e) {
     if (e && e.name === 'AbortError') return;
-    autoMeldung('Der Ordner ließ sich nicht öffnen: ' + ((e && e.message) || 'unbekannter Fehler'));
+    autoMeldung('Der Ordner ließ sich nicht öffnen (' + ((e && e.message) || 'unbekannter Fehler') + '). Wähle ihn noch einmal mit „Ordner wählen“.');
   });
 }
 function ordnerVergessen() {
@@ -9464,7 +9624,7 @@ function eireZugangSpeichern() {
   try { r = FahrplanNativ.setzeZugang(b, p); } catch (e) {}
   $('eire-passwort').value = '';
   if (r === 'ok') { eireZugangZeige(); $('eire-zugang').open = false; eireMeldung('Zugang gespeichert. Jetzt Zugnummer eingeben.'); $('eire-zug').focus(); }
-  else eireMeldung('Der Zugang ließ sich nicht speichern.');
+  else eireMeldung('Der Zugang ließ sich nicht speichern. Trag Benutzername und Passwort noch einmal ein und tippe auf „Speichern“.');
 }
 function eireZugangLoeschen() {
   try { FahrplanNativ.vergissZugang(); } catch (e) {}
@@ -9479,7 +9639,7 @@ function eireFehler(f, status) {
     $('eire-zugang').open = true;
     if (art !== 'passwort-abgelaufen') $('eire-benutzer').focus();
   }
-  eireMeldung((f && f.text) || ('EIRE hat mit Fehler ' + status + ' geantwortet.'));
+  eireMeldung((f && f.text) || ('EIRE hat mit Fehler ' + status + ' geantwortet. Versuch es in ein paar Minuten noch einmal.'));
 }
 function eireJson(antwort) {
   return antwort.json().then(function (j) { return { status: antwort.status, daten: j }; }, function () { return { status: antwort.status, daten: null }; });
@@ -9498,7 +9658,7 @@ function eireSuche(code) {
       if (r.status === 200 && Array.isArray(r.daten)) { eireZeige(r.daten, zug, datum); return; }
       eireFehler(r.daten, r.status);
     })
-    ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen.'); })
+    ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen. Prüfe die Netzverbindung und tippe noch einmal auf „Fahrpläne suchen“.'); })
     .then(function () { eireLaeuft = false; $('eire-suche').disabled = false; });
 }
 /* sortiert wie EIRE: Gültigkeitsbeginn, dann -ende, dann Anfangsbahnhof */
@@ -9553,7 +9713,7 @@ function eireLade(i) {
         }
       });
     })
-    ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen.'); })
+    ['catch'](function () { eireMeldung('Die App hat keine Antwort bekommen. Prüfe die Netzverbindung und tippe den Fahrplan noch einmal an.'); })
     .then(function () { eireLaeuft = false; });
 }
 /* PDF, die der App über Teilen oder „Öffnen mit“ übergeben wurden; die App reicht sie einzeln heraus */
@@ -9714,12 +9874,12 @@ function ortNeu() {
 }
 function ortStart() {
   if (!ortMoeglich()) return false;
-  if (!('geolocation' in navigator)) { ortMeldung('Dieser Browser bietet keinen Standortzugriff.'); return false; }
-  if (window.isSecureContext === false) { ortMeldung('Der Standortzugriff braucht eine https-Adresse.'); return false; }
+  if (!('geolocation' in navigator)) { ortMeldung('Dieser Browser bietet keinen Standortzugriff. Führe den Marker mit der Zeit-Automatik oder von Hand.'); return false; }
+  if (window.isSecureContext === false) { ortMeldung('Der Standortzugriff braucht eine https-Adresse. Öffne die Anzeige über https oder nutze die App.'); return false; }
   ortMeldung('');
   ortNeu();
   try { ortWache = navigator.geolocation.watchPosition(ortPunkt, ortAbbruch, { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 }); }
-  catch (e) { ortung = null; ortMeldung('Der Standortzugriff ließ sich nicht starten.'); return false; }
+  catch (e) { ortung = null; ortMeldung('Der Standortzugriff ließ sich nicht starten. Schalte die Ortung noch einmal ein.'); return false; }
   return true;
 }
 function ortStopp() {
