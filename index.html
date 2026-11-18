@@ -1170,6 +1170,8 @@ function nachbearbeiten(alle, kopf, warn) {
 function parse(pdfSeiten, opt) {
   var warnungen = [];
   function warn(t, seite) { warnungen.push({ text: t, seite: seite }); }
+  var hinweis = pdfSeiten.length ? pdfHinweis(pdfSeiten[0].items.map(function (i) { return i.s; }).join(' ')) : '';
+  if (hinweis) return { fehler: hinweis };
   var S = blattseiten(pdfSeiten);
   if (!S.length) return { fehler: 'Keine Fahrplantabelle gefunden. Erwartet wird ein Blattfahrplan aus der EBuLa-Rückfallebene mit den Spalten 1, 2, 3a, 3b, 4, 5.' };
   S.forEach(function (s) { var z = zeilenAus(s); s.zeilen = z.zeilen; s.noten = z.fuss; });
@@ -1207,9 +1209,25 @@ function zeilenVon(items, tol) {
   return z;
 }
 
-/* Kopfmarken einer Heftseite: Mitte von „1“, „2a“ … „4a“ auf einer Zeile, oder null */
+/* Nur die räumlich abgegrenzte Fußzeile zählt als Seitenzahl. Seitenverweise im Fahrweg
+   sind keine Seitenzahlen; „Seite“ und die Ziffern können getrennte PDF-Textstücke sein. */
+function heftFuss(pg) {
+  /* Die Nutzfläche mancher PDF ist auf einem größeren Blatt verschoben oder verkleinert.
+     Deshalb die Heftnummer als Anker nutzen, nicht einen Anteil der physischen Papierhöhe. */
+  var unten = zeilenVon(pg.items, 2);
+  for (var j = unten.length - 1; j >= 0; j--) {
+    var l = unten[j], m = /^(?:Efpl\s+)?([\d\s]+)\s+(?:Fpl\s+\d{4}\s+)?Seite\s*([\d\s]+)$/.exec(l.text);
+    if (!m) continue;
+    var links = m[1].replace(/\s/g, '');
+    if (!/^\d{4}$/.test(links)) continue;
+    return { nr: Number(m[2].replace(/\s/g, '')), y: l.y, heft: links };
+  }
+  return null;
+}
+
+/* Mitte von „2a“ … „4a“ auf einer Zeile. Die Kopfmarke „1“ fehlt auf manchen Ausgaben. */
 function heftSpalten(pg) {
-  var marken = ['1', '2a', '2b', '2c', '2d', '3a', '3b', '4a'], L = {};
+  var marken = ['2a', '2b', '2c', '2d', '3a', '3b', '4a'], L = {};
   pg.items.forEach(function (it) { var s = it.s.trim(); if (marken.indexOf(s) >= 0) (L[s] = L[s] || []).push(it); });
   if (!L['2a'] || !L['3b'] || !L['4a']) return null;
   for (var i = 0; i < L['2a'].length; i++) {
@@ -1219,37 +1237,69 @@ function heftSpalten(pg) {
       if (t) k[n] = t.x + (t.w || 0) / 2;
       return !!t;
     });
-    if (ok) return k;
+    if (ok && marken.every(function (n, j) { return !j || k[n] > k[marken[j - 1]]; })) return k;
   }
   return null;
 }
 
 /* Heftseite → Blattseite für Spalte '2a'…'2d'; null, wenn die Seite keine Fahrplantabelle ist */
 function ersatzBlattseite(pg, spalte, pdfSeite) {
-  var k = heftSpalten(pg);
-  if (!k) return null;
+  var k = heftSpalten(pg), fuss = heftFuss(pg);
+  if (!k || !fuss || !/^2[a-d]$/.test(spalte)) return null;
   var abkm = pg.items.filter(function (i) { return /^ab km$/.test(i.s.trim()) && i.y > k.y; })[0];
-  var y0 = abkm ? abkm.y + 4 : k.y + 45, y1 = pg.h, nr = null, strecke = '', heft = '';
+  var y0 = abkm ? abkm.y + 4 : k.y + 45, y1 = fuss.y - 4, nr = fuss.nr, strecke = '', heft = fuss.heft;
   pg.items.forEach(function (i) {
-    var t = norm(i.s), m = /^Seite (\d+)$/.exec(t);
-    if (m) { nr = Number(m[1]); y1 = Math.min(y1, i.y - 4); }
+    var t = norm(i.s);
     if (/^Strecke\s/.test(t) && i.y < k.y) strecke = t;
   });
-  pg.items.forEach(function (i) { if (/^\d{4}$/.test(i.s.trim()) && Math.abs(i.y - (y1 + 4)) < 3) heft = i.s.trim(); });
   var drin = pg.items.filter(function (i) { return i.y > y0 && i.y < y1; });
-  /* Schrifthöhe auf die der Blattseite bringen: normale Zeilen ~9,5, hochgestellte Ziffern < 8 */
-  var hs = drin.map(function (i) { return i.h; }).filter(function (h) { return h > 0; }).sort(function (a, b) { return a - b; });
-  var fh = hs.length ? 9.5 / hs[Math.floor(hs.length * 0.6)] : 1;
   var vEnde = k['2d'] + 12, kmAb = k['3b'] - 14, zeitAb = k['4a'] - 9, vNamen = ['2a', '2b', '2c', '2d'];
+  /* Fußnoten beginnen links von der Geschwindigkeitstabelle mit „1“ und „) …“.
+     Ihre langen Textstücke ragen in die Geschwindigkeitsspalten hinein. Diese sind Text,
+     auch wenn darin eine Seitenzahl steht, und müssen vor der Projektion getrennt werden. */
+  var fussAb = Infinity;
+  drin.forEach(function (i) {
+    if (i.x >= k['2a'] - 14 || !/^\d+$/.test(i.s.trim())) return;
+    var text = drin.some(function (t) { return t.x >= i.x && t.x < k['2a'] - 14 && /^\)/.test(t.s.trim()) && t.y >= i.y && t.y - i.y < 6; });
+    if (text) fussAb = Math.min(fussAb, i.y);
+  });
+  function vSpalte(it) {
+    var cx = it.x + (it.w || 0) / 2;
+    if (it.y >= fussAb || cx < k['2a'] - 14 || it.x >= vEnde) return null;
+    return vNamen.reduce(function (best, n) { return Math.abs(cx - k[n]) < Math.abs(cx - k[best]) ? n : best; }, '2a');
+  }
+  /* Etwa „4“ + „0“: nur unmittelbar benachbarte Ziffern derselben Geschwindigkeitsspalte
+     und Grundlinie verbinden. Vor der Projektion, solange die echten x-Koordinaten bekannt sind.
+     Die Originalstücke bleiben unverändert, damit andere Spalten dasselbe PDF erneut lesen können. */
+  var ersetzt = new Map();
+  vNamen.forEach(function (n) {
+    zeilenVon(drin.filter(function (i) { return vSpalte(i) === n && /^\d+$/.test(i.s.trim()); }), 0.75).forEach(function (l) {
+      var vor = null, ursprung = null;
+      l.its.forEach(function (it) {
+        var abstand = vor ? it.x - (vor.x + vor.w) : Infinity;
+        if (vor && abstand >= -0.5 && abstand < 2 && Math.abs(it.h - vor.h) < 0.5 && (vor.s.trim() + it.s.trim()).length <= 3) {
+          vor = { s: vor.s.trim() + it.s.trim(), x: vor.x, y: vor.y, w: it.x + it.w - vor.x, h: vor.h };
+          ersetzt.set(ursprung, vor); ersetzt.set(it, null);
+        } else { vor = it; ursprung = it; }
+      });
+    });
+  });
+  drin = drin.map(function (i) { return ersetzt.has(i) ? ersetzt.get(i) : i; }).filter(Boolean);
+  /* Schrifthöhe auf die der Blattseite bringen: normale Zeilen ~9,5, hochgestellte Ziffern < 8 */
+  var hs = drin.filter(function (i) { return i.y < fussAb; }).map(function (i) { return i.h; }).filter(function (h) { return h > 0; }).sort(function (a, b) { return a - b; });
+  var fh = hs.length ? 9.5 / hs[Math.floor(hs.length * 0.6)] : 1;
   var items = [], zeitY = [];
   drin.forEach(function (it) {
     var s = it.s.trim(), cx = it.x + (it.w || 0) / 2, x;
+    if (it.y >= fussAb) {
+      var ziffer = it.x < k['2a'] - 14 && /^\d+$/.test(s);
+      items.push({ s: it.s, x: ziffer ? 30 : 50 + it.x, y: it.y, w: it.w, h: ziffer ? 6 : 9.5 });
+      return;
+    }
     if (cx >= zeitAb) { if (/^\d+$/.test(s)) zeitY.push(it.y); return; }       // Mindestfahrzeiten
     if (cx < k['2a'] - 14) x = 30;                                               // Spalte 1
     else if (it.x < vEnde) {                                                     // Spalten 2a–2d
-      var best = null;
-      vNamen.forEach(function (n) { if (best === null || Math.abs(cx - k[n]) < Math.abs(cx - k[best])) best = n; });
-      if (best !== spalte) return;
+      if (vSpalte(it) !== spalte) return;
       x = 70;
     }
     else if (it.x >= kmAb && (RE_KM.test(s) || RE_PLUS.test(s))) x = 250;        // Spalte 3b
@@ -1257,10 +1307,11 @@ function ersatzBlattseite(pg, spalte, pdfSeite) {
     else x = Math.min(150, 92 + (it.x - vEnde) * 0.45);                         // Spalte 3a
     items.push({ s: it.s, x: x, y: it.y, w: (it.w || 0) * 0.45, h: it.h * fh });
   });
+  if (!items.length) return null; // erklärender Musterkopf ohne Fahrplanzeilen
   /* Zeitpunkte: Betriebsstellen mit Mindestfahrzeiten. Steht bei einer keine km-Angabe (z. B. „Abzw Südbrücke“),
      bekommt sie die der nächsten Zeile, sonst hinge der Leser sie an die Zeile davor. */
   var zeitpunkte = [], kmZeilen = items.filter(function (i) { return i.x === 250 && RE_KM.test(i.s.trim()); });
-  zeilenVon(drin.filter(function (i) { return i.x >= vEnde && i.x < kmAb; }), 2.5).forEach(function (l) {
+  zeilenVon(drin.filter(function (i) { return i.y < fussAb && i.x >= vEnde && i.x < kmAb; }), 2.5).forEach(function (l) {
     if (!zeitY.some(function (y) { return Math.abs(y - l.y) < 3; })) return;
     zeitpunkte.push(l.text);
     if (kmZeilen.some(function (k) { return Math.abs(k.y - l.y) < 3; })) return;
@@ -1273,22 +1324,35 @@ function ersatzBlattseite(pg, spalte, pdfSeite) {
 
 /* Zugriff auf ein Heft nach gedruckter Seitenzahl; Versatz gedruckt → PDF wird gesucht und gemerkt */
 function heftZugriff(pdfjsLib, doc) {
-  var cache = {}, versatz = 1;
+  var cache = {}, versatz = 1, nummern = {}, nummernSuche = null;
   async function pdfSeite(p) {
-    if (!cache[p]) cache[p] = doc.getPage(p).then(function (pg) { return leseText(pdfjsLib, pg); });
+    if (!cache[p]) cache[p] = doc.getPage(p).then(function (pg) { return leseText(pdfjsLib, pg); }).then(function (pg) {
+      var f = heftFuss(pg);
+      if (f) nummern[f.nr] = p;
+      return pg;
+    });
     return cache[p];
   }
-  function gedruckt(pg) { for (var i = 0; i < pg.items.length; i++) { var m = /^Seite (\d+)$/.exec(norm(pg.items[i].s)); if (m) return Number(m[1]); } return null; }
   return {
     doc: doc,
     seite: async function (nr) {
+      if (!(nr > 0 && nr === Math.floor(nr))) return null;
+      if (nummern[nr]) { var bekannt = await pdfSeite(nummern[nr]); bekannt.pdfSeite = nummern[nr]; return bekannt; }
       var versuche = [versatz, 0, 1, 2, 3, 4, 5, 6, -1, -2, 8, 10];
       for (var i = 0; i < versuche.length; i++) {
         var p = nr + versuche[i];
         if (p < 1 || p > doc.numPages) continue;
         var pg = await pdfSeite(p);
-        if (gedruckt(pg) === nr) { versatz = versuche[i]; pg.pdfSeite = p; return pg; }
+        var f = heftFuss(pg);
+        if (f && f.nr === nr) { versatz = versuche[i]; pg.pdfSeite = p; return pg; }
       }
+      /* Einfügeblätter können den Versatz stärker ändern. Dann einmal die echten Fußzeilen
+         indizieren, statt eine Seite zu schätzen oder auf eine andere Strecke auszuweichen. */
+      if (!nummernSuche) nummernSuche = (async function () {
+        for (var p = 1; p <= doc.numPages; p++) { await pdfSeite(p); delete cache[p]; }
+      })();
+      await nummernSuche;
+      if (nummern[nr]) { var gefunden = await pdfSeite(nummern[nr]); gefunden.pdfSeite = nummern[nr]; return gefunden; }
       return null;
     },
     /* Betriebsstellen jeder Fahrplanseite (gedruckte Seite, Namen in Reihenfolge); liest das Heft einmal ganz */
@@ -1313,11 +1377,21 @@ function heftZugriff(pdfjsLib, doc) {
     },
     kopf: async function () {
       var pg = await pdfSeite(1), t = norm(pg.items.map(function (i) { return i.s; }).join(' '));
-      var n = /Ersatzfahrplan\s+(\d{4})/.exec(t), g = /Gültig ab\s+(\d{1,2})\.\s*([A-Za-zäöü]+)\s+(\d{4})/.exec(t), ab = null;
+      var n = /Ersatzfahrplan\s+(\d{4})/.exec(t), g = /G[ü¸]ltig ab\s+(\d{1,2})\.\s*([A-Za-zäöü]+)\s+(\d{4})/i.exec(t), ab = null;
       if (g && MONAT[g[2].toLowerCase()]) ab = Number(g[3]) * 10000 + MONAT[g[2].toLowerCase()] * 100 + Number(g[1]);
       return { nr: n ? n[1] : '', gueltigAb: ab, titel: n ? 'Ersatzfahrplan ' + n[1] : '' };
     }
   };
+}
+
+/* Mehrzug-Buchfahrpläne und HGK-Hefte dürfen nicht als ein einzelner Blattfahrplan
+   zusammengelesen oder als Efpl abgelegt werden. Alle Importwege erhalten denselben Hinweis. */
+function pdfHinweis(text) {
+  if (/Buchfahrplan\s+\d{4}/.test(text) && !(/\b3a\b/.test(text) && /\b3b\b/.test(text)))
+    return 'Das ist ein Buchfahrplan-Heft, kein Ersatzfahrplan-Heft. Dieses Format wird noch nicht unterstützt. Bitte einen einzelnen Blattfahrplan aus EIRE laden.';
+  if (/Geschwindigkeitsheft\s+HGK|GeH\s+HGK/i.test(text) || (/Fahrzeitenheft/.test(text) && /HGK|Häfen und Güterverkehr/.test(text)))
+    return 'Das sind HGK-Fahrplanunterlagen. Dieses Format wird noch nicht unterstützt. Bitte die Original-PDF verwenden.';
+  return '';
 }
 
 /* Ähnlichkeit eines Fplo-Kurznamens mit einem Heftnamen (0 = keine) */
@@ -1469,12 +1543,12 @@ function fploFaehrt(Z, tag) {
 /* Fahrplan eines Fplo-Zugs aus den Heften bauen.
    hefte(nr) → Promise eines heftZugriff oder null; tag: JJJJMMTT. Ergebnis wie parse(). */
 async function bauePlanAusFplo(F, Z, tag, hefte, fortschritt) {
-  var warnungen = [], fehlend = [];
+  var warnungen = [], fehlend = [], zugeordnet = [];
   function warn(t, seite) { warnungen.push({ text: t, seite: seite }); }
   var reihen = Z.zeilen, starts = [];
   reihen.forEach(function (r, i) { if (r.ref) starts.push(i); });
   if (!starts.length) return { fehler: 'Die Fplo verweist bei Zug ' + Z.zug + ' auf kein Fahrplanheft (Bfpl … S. … Sp. …).' };
-  if (starts[0] > 0) warn('Die ersten ' + starts[0] + ' Betriebsstellen der Fplo haben keinen Heftverweis und fehlen', 0);
+  if (starts[0] > 0) return { fehler: 'Der Fahrplan ist unvollständig: Die ersten ' + starts[0] + ' Betriebsstellen haben keinen Heftverweis. Bitte die Original-Fplo verwenden.' };
   /* Kandidaten für Betriebsstellen: benannte Einträge, aber keine Signale („Esig Münster (W) Hbf“) */
   function name(E) { if (!E.lines.length || E.info || E.nurKm || E.nurV) return ''; var n = eintragName(E); return RE_KEINNAME.test(n) ? '' : n; }
   var gesamt = [], seitenZahl = 0, info = [];
@@ -1496,7 +1570,7 @@ async function bauePlanAusFplo(F, Z, tag, hefte, fortschritt) {
       var pg = await H.seite(p);
       if (!pg) break;
       var B = ersatzBlattseite(pg, ref.spalte, pg.pdfSeite);
-      if (!B) { if (S.length) break; p++; continue; }
+      if (!B) break;
       if (S.length && B.strecke && aktiv) break;
       var rows = zeilenVon(B.items, 2.5), behalten = [];
       rows.forEach(function (r) { r.t3 = norm(r.its.filter(function (i) { return i.x > 85 && i.x < 160; }).map(function (i) { return i.s; }).join(' ')); });
@@ -1605,6 +1679,7 @@ async function bauePlanAusFplo(F, Z, tag, hefte, fortschritt) {
       if (!stueck[0].v) warn('Heft ' + ref.heft + ' S. ' + ref.seite + ': Geschwindigkeit am Abschnittsanfang unbekannt', ref.seite);
     }
     bester.treffer.forEach(function (t) {
+      if (zugeordnet.indexOf(t.r) < 0) zugeordnet.push(t.r);
       var En = E[t.i];
       En.an = t.r.an ? { s: t.r.an, halt: t.r.halt } : null;
       En.ab = t.r.ab ? { s: t.r.ab } : null;
@@ -1616,9 +1691,10 @@ async function bauePlanAusFplo(F, Z, tag, hefte, fortschritt) {
     stueck.forEach(function (e) { gesamt.push(e); });
     info.push({ heft: ref.heft, seite: ref.seite, spalte: ref.spalte, zeilen: stueck.length });
   }
-  if (fehlend.length && !gesamt.length) return { fehler: 'Es fehlen die Fahrplanhefte ' + fehlend.join(', ') + '.', fehlendeHefte: fehlend };
+  if (fehlend.length) return { fehler: 'Es fehlen die Fahrplanhefte ' + fehlend.join(', ') + '.', fehlendeHefte: fehlend };
   if (!gesamt.length) return { fehler: 'Aus der Fplo ließ sich kein Abschnitt in den Heften finden.', warnungen: warnungen };
-  if (fehlend.length) warn('Fahrplanhefte fehlen: ' + fehlend.join(', ') + ' – diese Abschnitte sind nicht enthalten', 0);
+  var ohneZuordnung = reihen.filter(function (r) { return zugeordnet.indexOf(r) < 0; });
+  if (ohneZuordnung.length) return { fehler: 'Der Fahrplan ist unvollständig: ' + ohneZuordnung.map(function (r) { return '„' + r.name + '“'; }).join(', ') + ' nicht sicher im Heft gefunden. Bitte Fplo und Heft prüfen und die Original-PDF verwenden.', warnungen: warnungen };
   var dt = String(tag);
   var kopf = { zeilen: [], zug: Z.zug, gattung: Z.gattung, datum: { j: Number(dt.slice(0, 4)), m: Number(dt.slice(4, 6)), t: Number(dt.slice(6, 8)) }, datumText: dt.slice(6, 8) + '.' + dt.slice(4, 6) + '.' + dt.slice(0, 4),
     fahrplanVom: 'Fplo ' + F.name + ' (' + Z.abschnitt + ')', strecke: Z.laufweg, tage: Z.tageText, tfz: Z.tfz, last: Z.last, laenge: Z.laenge, mbr: Z.mbr.length ? Z.mbr[0].mbr : '', vmax: Z.vmax, gedruckt: '',
@@ -1626,11 +1702,13 @@ async function bauePlanAusFplo(F, Z, tag, hefte, fortschritt) {
   if (Z.mbr.length && Z.mbr[0].ab) kopf.mbr += ' (ab ' + Z.mbr[0].ab + ')';
   var regel = { typ: 'regel', name: 'Regelweg', eltern: null, seite: info[0].seite, zeilen: gesamt, hist: [], aktuell: null, vor: null, offen: null, letztesEv: null, strich: false, v: null, beendet: false, ziel: null, nach: '' };
   var z = nachbearbeiten([regel], kopf, warn);
+  var sollZeiten = reihen.reduce(function (n, r) { return n + (r.an ? 1 : 0) + (r.ab ? 1 : 0); }, 0);
+  if (z.zeiten !== sollZeiten) return { fehler: 'Der Fahrplan ist unvollständig: Nicht alle Zeiten aus der Fplo konnten übernommen werden. Bitte die Original-Fplo verwenden.', warnungen: warnungen };
   return { kopf: kopf, regel: regel, alternativen: [], blattseiten: seitenZahl, pdfSeiten: seitenZahl, seiten: [], form: 'Fplo + Ersatzfahrplan', zeiten: z.zeiten, basis: z.basis, warnungen: warnungen, abschnitte: info, fehlendeHefte: fehlend };
 }
 
 var api = { lesePdf: lesePdf, parse: parse, blattseiten: blattseiten, zeilenAus: zeilenAus, eintragName: eintragName,
-            leseText: leseText, leseFplo: leseFplo, fploFaehrt: fploFaehrt, heftZugriff: heftZugriff, ersatzBlattseite: ersatzBlattseite, bauePlanAusFplo: bauePlanAusFplo, aehnlich: aehnlich };
+            leseText: leseText, leseFplo: leseFplo, fploFaehrt: fploFaehrt, heftZugriff: heftZugriff, ersatzBlattseite: ersatzBlattseite, bauePlanAusFplo: bauePlanAusFplo, aehnlich: aehnlich, pdfHinweis: pdfHinweis };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Blattfahrplan = api;
 })(typeof self !== 'undefined' ? self : this);
 
@@ -1647,6 +1725,7 @@ var KM = '-?\\d+,\\d+(?:\\s*\\+\\s*\\d+)?';
 var RE_BEREICH = new RegExp('^(' + KM + ')\\s*-\\s*(' + KM + ')$');
 var RE_PUNKT = new RegExp('^(?:km\\s*)?(' + KM + ')$');
 var RE_FOLGE = new RegExp('^-\\s+(' + KM + ')$');
+var RE_OFFEN = new RegExp('^(?:km\\s*)?(' + KM + ')\\s*-$');
 function kmZahl(t) { var m = /^(-?\d+,\d+)(?:\s*\+\s*(\d+))?$/.exec(String(t).trim()); return m ? zahl(m[1]) + (m[2] ? Number(m[2]) / 1000 : 0) : null; }
 /* Spaltengrenzen der Tabelle bei Kopfziffer „1“ auf x = 33 */
 var GRENZEN = [50, 148, 246, 309, 373, 408, 443, 551];
@@ -1772,10 +1851,12 @@ function leseDeckblatt(pg) {
   if (iB >= 0) for (var k = iB + 1; k < iT; k++) if (z[k] && !/^DB Intern$/.test(z[k])) D.hinweise.push(z[k]);
   return D;
 }
+/* Die Pfeile „um angegebene Entfernung versetzt“ stehen auch bei Halteplätzen, nicht nur bei Signalen.
+   Was versetzt ist, nennt der Eintrag selbst; die Kurzform nennt nur die Richtung. */
 var KURZ = [
   [/^Gegenüber der letzten Ausgabe/, 'neu oder geändert'],
-  [/^Signal um angegebene Entfernung\s+in\s+Fahrtrichtung/, 'Signal in Fahrtrichtung versetzt'],
-  [/^Signal um angegebene Entfernung\s+entgegen/, 'Signal entgegen der Fahrtrichtung versetzt'],
+  [/^Signal um angegebene Entfernung\s+in\s+Fahrtrichtung/, 'in Fahrtrichtung versetzt'],
+  [/^Signal um angegebene Entfernung\s+entgegen/, 'entgegen der Fahrtrichtung versetzt'],
   [/gehobenem\s+Stromabnehmer/, 'für Fahrzeuge mit gehobenem Stromabnehmer']
 ];
 function leseLegende(pg, karte) {
@@ -1891,7 +1972,7 @@ function leseTabellen(seiten, legende, warn) {
       var t3 = inSpalte(1, 2), t4 = inSpalte(2, 3), t5 = inSpalte(3, 4), t8 = its.filter(function (i) { return i.x >= G[6]; });
       var b3 = bilderIn(1, 2), b4 = bilderIn(2, 3), b5 = bilderIn(3, 4), b8 = bil.filter(function (bb) { return (bb.x0 + bb.x1) / 2 >= G[6]; });
       function symText(b) { var L = legende[b.fp]; return L ? L.text : ''; }
-      function symOrt(b) { var L = legende[b.fp]; return L ? L.text : versetzt && b.form === 'auf' ? 'Signal in Fahrtrichtung versetzt' : versetzt && b.form === 'ab' ? 'Signal entgegen der Fahrtrichtung versetzt' : ''; }
+      function symOrt(b) { var L = legende[b.fp]; return L ? L.text : versetzt && b.form === 'auf' ? 'in Fahrtrichtung versetzt' : versetzt && b.form === 'ab' ? 'entgegen der Fahrtrichtung versetzt' : ''; }
       // Spalte 4 und 5 je Zelle vorbereiten
       var c4 = z4.map(function (z) {
         var txt = inZelle(t4, z), v = txt.filter(function (i) { return i.h >= 16 && /^\d+$/.test(i.s.trim()); }).map(function (i) { return Number(i.s.trim()); });
@@ -1927,14 +2008,58 @@ function leseTabellen(seiten, legende, warn) {
 }
 
 /* ---------- 4. Einträge aufbereiten ---------- */
-function datumZeit(zeilen) {
-  // "10.11." / "26" / "08:00"
-  var t = zeilen.join(' '), m = /(\d{1,2})\.(\d{1,2})\.\s*(\d{2})(?:\s+(\d{1,2}):(\d{2}))?/.exec(t);
-  if (!m) return { text: norm(t), ms: null };
-  var d = new Date(2000 + Number(m[3]), Number(m[2]) - 1, Number(m[1]), m[4] != null ? Number(m[4]) : 0, m[5] != null ? Number(m[5]) : 0);
-  return { text: m[1] + '.' + m[2] + '.' + m[3] + (m[4] != null ? ' ' + m[4] + ':' + m[5] : ''), ms: d.getTime(), mitUhr: m[4] != null };
+/* Spalten 6 und 7 („In Kraft ab“, „Außer Kraft ab“): ein oder mehrere Zeitpunkte, untereinander gedruckt,
+   z. B. „15.11.“ „26“ „22:20“ „und“ „16.11.“ „26“ „22:20“. Alle werden gelesen, nicht nur der erste.
+   Zweistellige Jahre zählen bis 20 Jahre nach dem Jahr der Ausgabe zu 20xx, sonst zu 19xx:
+   „01.01.90“ ist der 1. Januar 1990, nicht 2090. */
+function datumZeit(zeilen, jahr) {
+  var t = norm(zeilen.join(' ')), re = /(\d{1,2})\.(\d{1,2})\.\s*(\d{4}|\d{2})(?!\d)(?:\s+(\d{1,2}):(\d{2}))?/g, alle = [], m;
+  var bezug = jahr || new Date().getFullYear();
+  while ((m = re.exec(t))) {
+    var j = Number(m[3]), uhr = m[4] != null;
+    if (m[3].length === 2) { j += 2000; if (j > bezug + 20) j -= 100; }
+    alle.push({ text: m[1] + '.' + m[2] + '.' + m[3] + (uhr ? ' ' + m[4] + ':' + m[5] : ''), mitUhr: uhr,
+                ms: new Date(j, Number(m[2]) - 1, Number(m[1]), uhr ? Number(m[4]) : 0, uhr ? Number(m[5]) : 0).getTime() });
+  }
+  if (!alle.length) return { text: t, ms: null, alle: [] };
+  return { text: alle.map(function (a) { return a.text; }).join(' und '), ms: alle[0].ms, mitUhr: alle[0].mitUhr, alle: alle };
 }
-function bereite(bloecke, warn) {
+/* Zeitfenster aus den Zeitpunkten der Spalten 6 und 7: Ein Beginn gilt bis zum ersten Ende vor dem nächsten
+   Beginn, der letzte bis zum letzten Ende danach. Fehlt ein Ende, bleibt das Fenster offen –
+   im Zweifel gilt ein Eintrag länger, nie kürzer als gedruckt. */
+function fenster(von, bis) {
+  var A = von.slice().sort(function (a, b) { return a.ms - b.ms; }), Z = bis.slice().sort(function (a, b) { return a.ms - b.ms; });
+  if (!A.length) return Z.length ? [{ von: null, bis: Z[Z.length - 1] }] : [];
+  return A.map(function (a, i) {
+    var letzter = i === A.length - 1, weiter = letzter ? Infinity : A[i + 1].ms;
+    var passend = Z.filter(function (z) { return z.ms > a.ms && z.ms <= weiter; });
+    return { von: a, bis: passend.length ? passend[letzter ? passend.length - 1 : 0] : null };
+  });
+}
+/* Stand eines Eintrags zum Zeitpunkt t: im laufenden Fenster „jetzt“, sonst „vor“ dem nächsten Fenster,
+   nach allen „vorbei“. weitere: die Fenster danach. */
+function fensterAm(E, t) {
+  var F = E.fenster || [{ von: E.inKraft && E.inKraft.ms != null ? E.inKraft : null, bis: E.ausserKraft && E.ausserKraft.ms != null ? E.ausserKraft : null }];
+  for (var i = 0; i < F.length; i++) {
+    var f = F[i];
+    if (f.von && t < f.von.ms) return { st: 'vor', f: f, weitere: F.slice(i + 1) };
+    if (!f.bis || t < f.bis.ms) return { st: 'jetzt', f: f, weitere: F.slice(i + 1) };
+  }
+  return F.length ? { st: 'vorbei', f: F[F.length - 1], weitere: [] } : { st: 'jetzt', f: null, weitere: [] };
+}
+/* Weiterer km-Bereich in derselben Angabe (z. B. „1,7 - 2,0“ und „-0,05 - 1,7“): den Gesamtbereich nehmen.
+   Die Richtung gibt der erste Bereich vor; die weiteren sind oft unabhängig von der Fahrtrichtung aufsteigend
+   gedruckt. Hat der erste keine Richtung („49,4 - 49,4“), bleibt es bei ihm, der zweite bleibt Text. */
+function erweitere(T, a, b, ta, tb) {
+  var r = T.bis > T.von ? 1 : T.bis < T.von ? -1 : 0;
+  if (!r) return false;
+  var P = [{ km: T.von, t: T.vonText }, { km: T.bis, t: T.bisText }, { km: a, t: ta }, { km: b, t: tb }].sort(function (x, y) { return x.km - y.km; });
+  var lo = P[0], hi = P[P.length - 1];
+  T.von = r > 0 ? lo.km : hi.km; T.vonText = r > 0 ? lo.t : hi.t;
+  T.bis = r > 0 ? hi.km : lo.km; T.bisText = r > 0 ? hi.t : lo.t;
+  return true;
+}
+function bereite(bloecke, warn, jahr) {
   var n = 0;
   bloecke.forEach(function (B) {
     B.eintraege.forEach(function (E) {
@@ -1944,13 +2069,19 @@ function bereite(bloecke, warn) {
       delete E.bst;
       E.teile.forEach(function (T) {
         T.von = null; T.bis = null; T.punkte = []; T.rest = [];
-        // „7,5 + 17“ / „- 9,8“: Bereich über zwei Zeilen
+        // Bereich über zwei Zeilen: „7,5 + 17“ / „- 9,8“ oder „km 14,767 -“ / „km 14,795“
         var zl = [];
-        T.ort.forEach(function (z) { var f = RE_FOLGE.exec(z), l = zl.length - 1; if (f && l >= 0 && RE_PUNKT.test(zl[l])) zl[l] = zl[l] + ' - ' + f[1]; else zl.push(z); });
+        T.ort.forEach(function (z) {
+          var l = zl.length - 1, f = RE_FOLGE.exec(z), p = l >= 0 && RE_PUNKT.exec(zl[l]), o = l >= 0 && RE_OFFEN.exec(zl[l]), q = RE_PUNKT.exec(z);
+          if (f && p) zl[l] = p[1] + ' - ' + f[1];
+          else if (o && q) zl[l] = o[1] + ' - ' + q[1];
+          else zl.push(z);
+        });
         var gruppen = [], text = [];
         zl.forEach(function (z) {
           var m = RE_BEREICH.exec(z), q = RE_PUNKT.exec(z);
           if (m && T.von === null) { T.von = kmZahl(m[1]); T.bis = kmZahl(m[2]); T.vonText = m[1]; T.bisText = m[2]; }
+          else if (m && erweitere(T, kmZahl(m[1]), kmZahl(m[2]), m[1], m[2])) { /* Gesamtbereich der Angabe */ }
           else if (q) T.punkte.push({ km: kmZahl(q[1]), text: q[1] });
           else T.rest.push(z);
           // Anzeigeform: km-Zeilen mit „km“, aufeinanderfolgende Textzeilen zusammengezogen
@@ -1966,7 +2097,8 @@ function bereite(bloecke, warn) {
         T.geltung = T.geltung.join(' · ');
         delete T.fp;
       });
-      E.inKraft = datumZeit(E.sp6); E.ausserKraft = datumZeit(E.sp7);
+      E.inKraft = datumZeit(E.sp6, jahr); E.ausserKraft = datumZeit(E.sp7, jahr);
+      E.fenster = fenster(E.inKraft.alle, E.ausserKraft.alle);
       delete E.sp6; delete E.sp7;
       E.strecke = B.nr + B.ri;
       if (!E.teile.length) warn('Eintrag ' + E.nr + ' ohne Ortsangabe', E.seite);
@@ -1976,11 +2108,27 @@ function bereite(bloecke, warn) {
   return n;
 }
 
+/* Andere La-Unterlagen an Seite 1 erkennen und klar benennen. Auch das Deckblatt der Tages-La nennt
+   „Sonderdrucke zur La“; sie beginnt aber mit „Tages-La“ und trägt ein Wochentagsdatum. Geprüft wird ohne
+   Leerzeichen, weil manche PDF Wörter zerreißen („Sonder d ruck zu r La“). Sonder-La stehen im Titel, also
+   am Anfang; Weisungen nennen sie erst weiter unten. */
+function laHinweis(text) {
+  var s = String(text || '').replace(/\s+/g, '');
+  if (/^(DBIntern)?Tages-La/.test(s) || /(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag),\d{1,2}\.[A-Za-zäöü]+\d{4}/.test(s)) return '';
+  if (/ErgänzungzuraktuellenTages-La/.test(s)) return 'Das ist eine Ergänzung zur Tages-La. Sie nennt weitere geltende Sonder-La und enthält selbst keine La-Einträge. Diese Sonder-La bitte im Original beachten.';
+  if (/Bedarfsermi/.test(s)) return 'Das ist eine Bedarfsermittlung für Sonderdrucke, keine La.';
+  if (/Langsamfahrstellen/.test(s) && /HGK/.test(s)) return 'Das ist eine La der HGK. Dieses Format wird noch nicht unterstützt. Bitte die Original-PDF verwenden.';
+  if (/Sonder-?L[Aa](?![a-zäöüß])|Sonderdruckzu[mr]La(?![a-zäöüß])/.test(s.slice(0, 400))) return 'Das ist eine Sonder-La. Sie wird noch nicht gelesen: Ihre La-Einträge und Angaben zum Ersatzfahrplan fehlen in der Anzeige. Bitte die Original-PDF verwenden.';
+  return '';
+}
+
 function parse(seiten) {
   var warnungen = [];
   function warn(t, s) { warnungen.push({ text: t, seite: s }); }
   if (!seiten.length) return { fehler: 'Die Datei enthält keine Seiten.' };
   var D = leseDeckblatt(seiten[0]);
+  var hinweis = D.tag ? '' : laHinweis(seiten[0].items.map(function (i) { return i.s; }).join(' '));
+  if (hinweis) return { fehler: hinweis };
   if (!D.bereich) {
     if (zeilenText(seiten[0]).some(function (t) { return /^Übersichtskarten?\b/.test(t); })) return { fehler: 'Das ist eine Übersichtskarte. Gelesen wird nur die Tages-La.' };
     return { fehler: 'Kein Deckblatt einer Tages-La gefunden (erwartet wird „La-Bereich …“ auf Seite 1).' };
@@ -1988,7 +2136,7 @@ function parse(seiten) {
   var legende = {};
   seiten.forEach(function (pg) { if (pg.items.some(function (i) { return i.s.trim() === 'Bedeutung'; })) leseLegende(pg, legende); });
   var bloecke = leseTabellen(seiten, legende, warn);
-  var n = bereite(bloecke, warn);
+  var n = bereite(bloecke, warn, D.tag ? D.tag.j : null);
   if (!n) return { fehler: 'In der Datei wurde kein La-Eintrag gefunden.' };
   function ms(d, endeTag) { if (!d) return null; var h = d.h === null ? (endeTag ? 24 : 0) : d.h; return new Date(d.j, d.m - 1, d.t, h, d.mi || 0).getTime(); }
   var unbekannt = 0;
@@ -2206,7 +2354,7 @@ function beruehrt(zeilenListen, docs, nameVon) {
   });
 }
 
-var api = { lesePdf: lesePdf, parse: parse, ordne: ordne, beruehrt: beruehrt, schluessel: schluessel };
+var api = { lesePdf: lesePdf, parse: parse, ordne: ordne, beruehrt: beruehrt, schluessel: schluessel, fensterAm: fensterAm, hinweis: laHinweis };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TagesLa = api;
 })(typeof self !== 'undefined' ? self : this);
 
@@ -8414,12 +8562,13 @@ function fahrtEnde() {
   if (fenster) { var e = fenster.e + (modus === 'hand' ? 0 : Math.max(0, verspaetung())) + 3600000; if (e > t && e < t + 36 * 3600000) return e; }
   return t + 12 * 3600000;
 }
-/* Stand eines Eintrags: Ausgabe gültig? Spalten „In Kraft ab“ und „Außer Kraft ab“ gegen die echte Uhr */
+/* Stand eines Eintrags: Ausgabe gültig? Zeitfenster aus „In Kraft ab“ und „Außer Kraft ab“ gegen die echte Uhr.
+   Mehrere Fenster („15.11. 22:20 und 16.11. 22:20“) zählen einzeln. t.w: das maßgebende Fenster für die Anzeige. */
 function laStand(t) {
-  var e = t.e, echt = Date.now();
+  var echt = Date.now(), w = t.w = TagesLa.fensterAm(t.e, echt);
   if (!laGueltig(laDocs[t.doc], echt)) return 'alt';
-  if (e.ausserKraft.ms != null && e.ausserKraft.ms <= echt) return 'vorbei';
-  if (e.inKraft.ms != null && e.inKraft.ms > echt) return e.inKraft.ms > fahrtEnde() ? 'spaeter' : 'bald';
+  if (w.st === 'vorbei') return 'vorbei';
+  if (w.st === 'vor') return w.f.von.ms > fahrtEnde() ? 'spaeter' : 'bald';
   return 'jetzt';
 }
 /* Angaben in spitzen Klammern gelten für Fahrten auf dem Gegengleis. og(E): die Zeile ohne diese Angaben. */
@@ -8613,10 +8762,13 @@ function laTeil(T, mitGeltung, mitGrund) {
   if (mitGrund) { var g = laGrundHtml(T); if (g) s.push(g); }
   return s.join(' · ');
 }
-function laFrist(e, d) {
-  var s = [];
-  if (e.inKraft.ms != null && (e.inKraft.mitUhr || e.inKraft.ms >= d.vonMs - 2 * 86400000)) s.push('ab ' + e.inKraft.text);
-  if (e.ausserKraft.text) s.push('bis ' + e.ausserKraft.text);
+/* Frist des maßgebenden Zeitfensters w; spätere Fenster folgen mit „wieder“ */
+function laFrist(e, d, w) {
+  var s = [], f = w && w.f;
+  if (f && f.von && (f.von.mitUhr || f.von.ms >= d.vonMs - 2 * 86400000)) s.push('ab ' + f.von.text);
+  if (f && f.bis) s.push('bis ' + f.bis.text);
+  else if (e.ausserKraft.text && !(e.ausserKraft.alle || []).length) s.push('bis ' + e.ausserKraft.text);
+  (w ? w.weitere : []).forEach(function (g) { s.push('wieder' + (g.von ? ' ab ' + g.von.text : '') + (g.bis ? ' bis ' + g.bis.text : '')); });
   return s.join(' · ');
 }
 function laGleich(teile, wert) { var w = teile.length ? wert(teile[0]) : ''; return teile.every(function (T) { return wert(T) === w; }) ? w : null; }
@@ -8640,9 +8792,9 @@ function laZeileHtml(E, i) {
   if (zus.length) tx += '<span class="la-zus">' + zus.join(' · ') + '</span>';
   if (nGg) tx += '<span class="la-zus">+ ' + nGg + (nGg === 1 ? ' Angabe' : ' Angaben') + ' nur für das Gegengleis, mit GW</span>';
   tx += '</span>';
-  var fr = laFrist(e, d);
-  if (t.st === 'vorbei') tx += '<span class="la-zus la-gelt">außer Kraft seit ' + esc(e.ausserKraft.text) + '</span>';
-  else if (t.st === 'spaeter') tx += '<span class="la-zus la-gelt">erst ab ' + esc(e.inKraft.text) + ' in Kraft' + (e.ausserKraft.text ? ' · bis ' + esc(e.ausserKraft.text) : '') + '</span>';
+  var w = t.w || TagesLa.fensterAm(e, Date.now()), f = w.f, fr = laFrist(e, d, w);
+  if (t.st === 'vorbei') tx += '<span class="la-zus la-gelt">außer Kraft seit ' + esc(f && f.bis ? f.bis.text : e.ausserKraft.text) + '</span>';
+  else if (t.st === 'spaeter' && f && f.von) tx += '<span class="la-zus la-gelt">erst ab ' + esc(f.von.text) + ' in Kraft' + (f.bis ? ' · bis ' + esc(f.bis.text) : '') + '</span>';
   else if (t.st === 'bald') tx += '<span class="la-zus la-gelt">noch nicht in Kraft · ' + esc(fr) + '</span>';
   else if (fr) tx += '<span class="la-zus">' + esc(fr) + '</span>';
   if (!t.sicher && t.hinweis) tx += '<span class="la-frage">' + esc(t.hinweis) + '</span>';
@@ -8886,6 +9038,7 @@ function zeigeLaEintrag(t, zurueck) {
   });
   dl.push(['In Kraft ab', esc(e.inKraft.text || '–')]);
   if (e.ausserKraft.text) dl.push(['Außer Kraft ab', esc(e.ausserKraft.text)]);
+  if (e.fenster && e.fenster.length > 1) dl.push(['Zeitfenster', esc(e.fenster.map(function (f) { return (f.von ? f.von.text : '') + ' – ' + (f.bis ? f.bis.text : 'kein Ende angegeben'); }).join(' · '))]);
   var st = laStand(t);
   if (st !== 'jetzt') dl.push(['Stand', st === 'alt' ? 'Ausgabe gilt nicht für heute' : st === 'vorbei' ? 'außer Kraft' : 'noch nicht in Kraft']);
   if (t.hinweis || t.grund) dl.push(['Einordnung', esc(t.hinweis || t.grund)]);
@@ -9126,13 +9279,14 @@ function speichereLa() {
       return { bereich: d.bereich, tagText: d.tagText, tagMs: d.tagMs, vonMs: d.vonMs, bisMs: d.bisMs, hinweise: d.hinweise, datei: d.datei, eintraege: d.eintraege, seiten: d.seiten,
         nWarn: d.nWarn, unbekannt: d.unbekannt, bloecke: d.bloecke.filter(function (B) { return nrn[di][B.nr]; }) };
     });
-    sessionStorage.setItem(LA_SPEICHER, JSON.stringify({ ver: 1, plan: planKennung(), docs: docs }));
+    /* ver 2: Zeitfenster und Jahre vor 2000; eine ältere Ablage wird verworfen, die La dann neu geteilt */
+    sessionStorage.setItem(LA_SPEICHER, JSON.stringify({ ver: 2, plan: planKennung(), docs: docs }));
   } catch (e) { try { sessionStorage.removeItem(LA_SPEICHER); } catch (e2) {} }
 }
 function holeLa() {
   try {
     var l = JSON.parse(sessionStorage.getItem(LA_SPEICHER) || 'null');
-    if (!l || l.ver !== 1 || !l.docs || !l.docs.length || l.plan !== planKennung()) return;
+    if (!l || l.ver !== 2 || !l.docs || !l.docs.length || l.plan !== planKennung()) return;
     laDocs = l.docs.map(function (d) { d.voll = false; d.pdf = null; return d; });
     laGeaendert();
   } catch (e) { laDocs = []; }
@@ -9194,10 +9348,16 @@ function pdfArt(datei) {
     return doc.getPage(1).then(function (seite) { return seite.getTextContent(); }).then(function (inhalt) {
       var stuecke = inhalt.items.map(function (i) { return String(i.str || '').trim(); }), text = stuecke.join(' ');
       var tabelle = stuecke.indexOf('3a') >= 0 && stuecke.indexOf('3b') >= 0;
+      var hinweis = Blattfahrplan.pdfHinweis(text);
       doc.destroy();
-      return { art: !tabelle && /La[-\u2010\u2011]\s*Bereich|Übersichtskarte/.test(text) ? 'la'
+      if (hinweis) return { art: 'hinweis', text: hinweis, fplo: false };
+      var art = !tabelle && /La[-\u2010\u2011]\s*Bereich|Übersichtskarte/.test(text) ? 'la'
         : /Ersatzfahrplan\s+\d{4}/.test(text) && !tabelle ? 'heft'
-        : /\bFplo\s+\S/i.test(text) && /gültig (vom|am)\b/.test(text) ? 'fplo' : 'plan', fplo: /Fahrplananordnung|\bFplo\b/i.test(text) };
+        : /\bFplo\s+\S/i.test(text) && /gültig (vom|am)\b/.test(text) ? 'fplo' : 'plan', fplo = /Fahrplananordnung|\bFplo\b/i.test(text);
+      /* Sonder-La, Ergänzungen zur Tages-La, HGK-La: eigene Formate, klar benennen. Nie bei Fahrplan, Fplo oder Heft. */
+      var laHin = (art === 'la' || art === 'plan') && !tabelle && !fplo ? TagesLa.hinweis(text) : '';
+      if (laHin) return { art: 'hinweis', text: laHin, fplo: false };
+      return { art: art, fplo: fplo };
     }, function (e) { doc.destroy(); throw e; });
   })['catch'](function () { return { art: 'plan', fplo: false }; });
 }
@@ -9213,7 +9373,8 @@ function ladeUnbekannt(dateien) {
   return Promise.all(dateien.map(pdfArt)).then(function (arten) {
     dateien.forEach(function (d, i) {
       if (arten[i].fplo) fplo[d.name] = true;
-      if (arten[i].art === 'fplo' || arten[i].art === 'heft') ablage.push({ d: d, art: arten[i].art });
+      if (arten[i].art === 'hinweis') notizen.push('„' + d.name + '“: ' + arten[i].text);
+      else if (arten[i].art === 'fplo' || arten[i].art === 'heft') ablage.push({ d: d, art: arten[i].art });
       else (arten[i].art === 'la' ? las : plaene).push(d);
     });
     echteLa = las.length;
@@ -9298,7 +9459,37 @@ function dokLaden() {
       };
       c.onerror = function () { db.close(); ok(liste); };
     });
-  })['catch'](function () { return []; }).then(function (l) { dokMeta = l; return l; });
+  })['catch'](function () { return []; }).then(function (l) {
+    /* Ältere Leser haben bei einzelnen Ausgaben kein Datum gespeichert. Einmal aus den
+       vorhandenen PDF-Bytes nachlesen; erneutes Teilen ist dafür nicht nötig. */
+    var ohneDatum = l.filter(function (d) { return d.art === 'heft' && !d.gueltigAb; });
+    if (!ohneDatum.length) { dokMeta = l; return l; }
+    var repariert = false;
+    return holePdfJs().then(function () {
+      return ohneDatum.reduce(function (kette, d) {
+        return kette.then(function () {
+          return dokArbeit('readonly', function (s) { return s.get(d.schluessel); });
+        }).then(function (v) {
+          if (!v || !v.bytes) return;
+          return pdfjsLib.getDocument({ data: new Uint8Array(v.bytes.slice(0)), disableFontFace: true, verbosity: 0 }).promise.then(function (doc) {
+            return Blattfahrplan.heftZugriff(pdfjsLib, doc).kopf().then(function (k) {
+              doc.destroy();
+              if (!k.nr || k.nr !== d.nr || !k.gueltigAb) return;
+              v.gueltigAb = k.gueltigAb;
+              var neu = 'heft:' + k.nr + ':' + k.gueltigAb;
+              return dokArbeit('readwrite', function (s) {
+                var vorhanden = s.get(neu);
+                vorhanden.onsuccess = function () { if (neu === d.schluessel || !vorhanden.result) s.put(v, neu); };
+              }).then(function () { if (neu !== d.schluessel) return dokLoeschen(d.schluessel); }).then(function () { repariert = true; });
+            }, function (e) { doc.destroy(); throw e; });
+          });
+        })['catch'](function () {});
+      }, Promise.resolve());
+    })['catch'](function () {}).then(function () {
+      if (repariert) return dokLaden();
+      dokMeta = l; return l;
+    });
+  });
 }
 function dokBytes(schluessel) { return dokArbeit('readonly', function (s) { return s.get(schluessel); }).then(function (v) { return v ? v.bytes : null; }); }
 function dokLoeschen(schluessel) {
@@ -9319,6 +9510,7 @@ function dokAufnehmen(datei, art) {
       return Blattfahrplan.heftZugriff(pdfjsLib, doc).kopf().then(function (k) {
         doc.destroy();
         if (!k.nr) return '„' + datei.name + '“: Heftnummer nicht gefunden, nicht gespeichert.';
+        if (!k.gueltigAb) return '„' + datei.name + '“: Gültigkeitsbeginn nicht gefunden, nicht gespeichert. Bitte die aktuelle Ausgabe aus DiLoc teilen.';
         var schl = 'heft:' + k.nr + ':' + (k.gueltigAb || 0);
         return dokArbeit('readwrite', function (s) {
           s.put({ art: 'heft', nr: k.nr, gueltigAb: k.gueltigAb, name: datei.name, groesse: buf.byteLength, bytes: buf }, schl);
@@ -9339,10 +9531,10 @@ function dokAufnehmen(datei, art) {
     });
   })['catch'](function (e) { return '„' + datei.name + '“ ließ sich nicht speichern' + (e && e.message ? ' (' + e.message + ')' : '') + '.'; });
 }
-/* Heft Nummer nr für den Tag: jüngste Ausgabe, die an dem Tag schon gilt, sonst die jüngste */
+/* Heft Nummer nr für den Tag: nur Ausgaben mit bekanntem, bereits erreichtem Gültigkeitsbeginn. */
 function heftFuer(nr, tag) {
-  var h = dokMeta.filter(function (d) { return d.art === 'heft' && d.nr === nr; }).sort(function (a, b) { return (b.gueltigAb || 0) - (a.gueltigAb || 0); });
-  return h.filter(function (d) { return !d.gueltigAb || d.gueltigAb <= tag; })[0] || h[0] || null;
+  var h = dokMeta.filter(function (d) { return d.art === 'heft' && d.nr === nr && d.gueltigAb && d.gueltigAb <= tag; }).sort(function (a, b) { return b.gueltigAb - a.gueltigAb; });
+  return h[0] || null;
 }
 function heftOeffnen(meta) {
   if (!heftOffen[meta.schluessel]) {
