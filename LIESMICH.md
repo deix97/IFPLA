@@ -43,6 +43,13 @@ Die Schrift folgt der Schriftgröße in den Einstellungen des Tablets, von 85 bi
 Fahrplan-Leser keine Tabelle, versucht sie es noch als La. Mehrere PDF auf einmal gehen auch; es gilt
 immer nur ein Fahrplan. Dasselbe gilt für „PDF auswählen“ und „Öffnen mit“, auch im Browser.
 
+**Tages-La:** Gelesen werden alle Einträge mit Ort, Geschwindigkeit, Geltung und Gründen.
+- **Mehrere Zeitpunkte:** „In Kraft ab“ und „Außer Kraft ab“ können mehrere Zeitpunkte nennen, z. B. „15.11. 22:20 und 16.11. 22:20“. Jedes Zeitfenster zählt für sich, ein Fenster ohne Ende bleibt offen.
+- **Jahre vor 2000:** Zweistellige Jahre wie „01.01.90“ gehören ins 20. Jahrhundert.
+- **Mehrere km-Bereiche:** Nennt eine Angabe mehrere km-Bereiche, wird der Gesamtbereich eingeordnet.
+
+**Andere La-Unterlagen:** Sonder-La, Ergänzungen zur Tages-La, La der HGK und Bedarfsermittlungen werden erkannt und mit einem Hinweis abgewiesen. **Sonder-La werden nicht gelesen.** Ihre La-Einträge und Angaben zum Ersatzfahrplan (Änderungsheft) fehlen deshalb in der Anzeige, auch in Fahrplänen aus Fplo und Efpl-Heft. Welche Sonder-La gelten, steht auf dem Deckblatt der Tages-La, und die Anzeige zeigt diese Hinweise.
+
 ## Fahrplananordnung (Fplo) mit Ersatzfahrplan
 
 Eine Fplo nennt je Zug die Betriebsstellen mit Ankunft und Abfahrt und verweist mit „Bfpl 3995 S.400
@@ -58,6 +65,18 @@ Geschwindigkeit der genannten Spalte (2a–2d, je eine Zugklasse) aus dem Heft, 
    (steht auf heute), ggf. Zugnummer eingeben, den Zug antippen.
 
 Unter *Gespeichert: …* steht, bis wann eine Fplo da ist; alles lässt sich dort auch einzeln entfernen.
+
+Der Heftleser verarbeitet auch fehlende Kopfmarken „1“, getrennte Ziffern und Seitenzahlen sowie
+verschobene oder verkleinerte PDF-Nutzflächen. Er unterscheidet Seitenverweise und Fußnoten von
+Fahrplandaten. Beim Datum gilt nur eine Ausgabe, deren Gültigkeitsbeginn bekannt und bereits
+erreicht ist. Ein früher ohne Datum gespeichertes Heft wird aus seinen vorhandenen PDF-Bytes
+nachgelesen und berichtigt. Fehlen Betriebsstellen oder Zeiten, wird kein unvollständiger Fahrplan
+übernommen.
+
+**Andere Formate:** Die Buchfahrplan-Hefte 6353/6354 und die HGK-Unterlagen sind keine Efpl-Hefte
+mit den Spalten 2a–2d. Sie werden mit einem konkreten Hinweis erkannt; ihr Inhalt wird nicht als
+ein einzelner Blattfahrplan zusammengelesen. Für diese Formate vorerst die Original-PDF bzw.
+einen einzelnen Blattfahrplan aus EIRE verwenden.
 
 Gibt es zu einem Zug mehrere Fassungen (z. B. 6.3 und 6.4), steht dabei, an welchem Tag er fährt;
 die Anzeige baut immer die zum gewählten Tag. Fehlt ein Heft, sagt sie welches.
@@ -146,7 +165,23 @@ Herkunft für pdf.js lässt sich mit `?pdfjs=…` setzen; sie wird gemerkt.
 | `lib/` | pdf.js 3.11.174 samt Lizenz |
 | `android/` | Android-App: Hülle um die Anzeige und Zugriff auf EIRE |
 | `.github/workflows/android-app.yml` | baut die App und legt sie als Release ab |
+| `tests/` | Regressionstests der Leser (Efpl-Heft, Tages-La) und lokale Bestandsprüfung |
 
-Fahrplan-PDF werden nirgends dauerhaft abgelegt: eine geteilte PDF liegt bis zum Start der Anzeige
-kurz in der Ablage des Dienstarbeiters und wird dann gelöscht, alles Weitere bleibt im Speicher des
-Tabs.
+## Leser prüfen
+
+Mit Node.js, ohne zusätzliche Pakete: `node --test tests/`. Die Tests laden denselben Leser wie die Anzeige und verwenden künstliche Daten:
+- **`efpl.test.cjs`:** Seitenzahlen, Spalten, Ziffern, Fußnoten, Gültigkeit und unvollständige Fplo.
+- **`la.test.cjs`:** Zeitfenster und Jahre in „In Kraft“/„Außer Kraft“, km-Bereiche, Zeichenerklärung und die Erkennung von Sonder-La, Ergänzungen, HGK-La und Bedarfsermittlungen. Dazu kommt eine künstliche Tabellenseite, die durchgehend gelesen wird.
+
+Den eigenen PDF-Bestand vollständig prüfen:
+`node tests/efpl-bestand.cjs "C:\Pfad\zu\Efpl-Hefte" "C:\Pfad\außerhalb-des-Repos\Ergebnis.json"`.
+Das Skript verwendet das mitgelieferte pdf.js, liest jede PDF-Seite, prüft die vier Spalten,
+Seitenzugriff und Streckenindex und baut je Heft vier Testfahrpläne. Andere Formate werden
+als solche geprüft. Die Zeiten dieser Testfahrpläne sind künstlich; die Prüfung ersetzt keinen
+fachlichen Abgleich jeder Fahrplanzeile mit dem Original. Dienstliche PDF und daraus erzeugte
+Ergebnisse gehören nicht ins öffentliche Repo.
+
+Eine geteilte PDF liegt bis zum Start kurz in der Ablage des Dienstarbeiters und wird dort anschließend
+gelöscht. Ersatzfahrplan-Hefte bleiben in der Geräteablage, Fplo höchstens 24 Stunden. Die Original-PDF
+eines angezeigten Blattfahrplans bleibt im Speicher des Tabs; die gelesenen Fahrplandaten werden für
+den Offline-Neustart gespeichert.
