@@ -143,7 +143,6 @@ svg{flex:none}
   background:var(--flaeche);font-family:var(--schrift-dicht);font-stretch:condensed;font-weight:600;font-size:var(--t-callout)}
 .status.oben{margin-top:var(--a2);border-radius:var(--r-karte) var(--r-karte) 0 0;border-bottom:1px solid var(--trenner-fein)}
 .status.unten{min-height:var(--ziel);padding-top:0;padding-bottom:0;padding-right:var(--a1);border-top:1px solid var(--trenner-fein);border-radius:0 0 var(--r-karte) var(--r-karte)}
-.status .leer{color:var(--text-2);font-weight:500}
 .status .erm.ist-la{padding:1px var(--a2) 1px calc(var(--a2) + 3px);border-radius:var(--r-klein);background:var(--warnung-grund);color:var(--warnung-text);box-shadow:inset 3px 0 0 var(--warnung)}
 .status .versp{font-weight:700;font-size:var(--t-headline)}
 /* „Blattseite …“ öffnet die Originalseite: Textknopf mit Pfeil */
@@ -249,7 +248,6 @@ svg{flex:none}
 .leerstand{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--a2);padding:var(--a6);text-align:center}
 .leerstand svg{width:3.5rem;height:3.5rem;margin-bottom:var(--a1);color:var(--text-2)}
 .leerstand .leer-titel{margin:0;font-size:var(--t-titel3);font-weight:700}
-.leerstand .leer-text{margin:0 0 var(--a2);max-width:34ch;font-size:var(--t-subhead);color:var(--text-2)}
 
 /* ---------- Tastenleiste: schwebende Steuerebene aus Material ---------- */
 .tasten{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:var(--a1);margin:var(--a2) 0 max(var(--a2),env(safe-area-inset-bottom));padding:var(--a1);
@@ -279,6 +277,7 @@ svg{flex:none}
 .gruppe .gruppe .gl{font-size:var(--t-subhead);color:var(--text-2)}
 .reihe{display:flex;flex-wrap:wrap;align-items:center;gap:var(--a2)}
 .klar{margin:0;max-width:65ch;font-size:var(--t-footnote);line-height:1.4;color:var(--text-2)}
+.klar:empty{display:none}
 .quelle{margin:0;max-width:65ch;font-size:var(--t-caption);color:var(--text-2)}
 .meldung{display:flex;align-items:flex-start;gap:var(--a2);padding:var(--a3);border-radius:var(--r);background:var(--akzent-zart);color:var(--text);font-size:var(--t-subhead)}
 .meldung::before{content:"";flex:none;width:1.2em;height:1.2em;background:var(--akzent);-webkit-mask:var(--i-info) center/contain no-repeat;mask:var(--i-info) center/contain no-repeat}
@@ -396,7 +395,6 @@ details[open] > summary::after{transform:rotate(90deg)}
     <span class="chip" id="ch-datum" hidden></span>
     <span class="chip achtung" id="ch-gw" hidden>Gegengleis</span>
     <span class="chip" id="ch-la">La nicht geladen</span>
-    <span id="hinweistext">Inoffizielle Anzeige. Maßgebend bleiben Fahrplan-PDF und La.</span>
   </div>
 
   <header class="kopf">
@@ -419,7 +417,6 @@ details[open] > summary::after{transform:rotate(90deg)}
     <div class="leerstand" id="leerstand">
       <svg viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h15l10 10v26a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z"/><path d="M28 5v10h10"/><path d="M17 24h14M17 30h14M17 36h8"/></g></svg>
       <p class="leer-titel">Kein Fahrplan geladen</p>
-      <p class="leer-text">Hol den Fahrplan aus EIRE, bau ihn aus einer Fplo oder wähle die PDF aus.</p>
       <button class="knopf haupt" type="button" id="leer-laden">Fahrplan laden</button>
     </div>
     <button class="wdh" type="button" id="wdh" aria-label="Zurück zum Ortsmarker">
@@ -434,7 +431,6 @@ details[open] > summary::after{transform:rotate(90deg)}
         <div class="reihe">
           <input class="eingabe eng" type="text" id="eire-zug" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="Zugnummer" aria-label="Zugnummer">
           <input class="eingabe eng" type="date" id="eire-datum" aria-label="Datum">
-          <select class="eingabe eng" id="eire-ansicht" aria-label="PDF-Ansicht"><option value="1">zweispaltig</option><option value="0">einspaltig</option></select>
           <button class="knopf haupt" type="button" id="eire-suche">Fahrpläne suchen</button>
         </div>
         <div class="reihe" id="eire-codereihe" hidden>
@@ -455,7 +451,7 @@ details[open] > summary::after{transform:rotate(90deg)}
               <button class="knopf weg" type="button" id="eire-zugang-weg" hidden>Zugang löschen</button>
               <span class="klar" id="eire-zugang-stand"></span>
             </div>
-            <p class="klar">Benutzername und Passwort liegen verschlüsselt im Schlüsselspeicher dieses Tablets und gehen nur an eire.noncd.db.de. Welcher Fahrplan gilt, wählst du selbst aus der Liste. <span id="eire-fassung"></span></p>
+            <p class="klar" id="eire-fassung"></p>
           </div>
         </details>
       </div>
@@ -470,13 +466,11 @@ details[open] > summary::after{transform:rotate(90deg)}
         <details class="aufklapp" id="fplo-ablage">
           <summary id="fplo-ablage-titel">Gespeicherte Fplo und Ersatzfahrpläne</summary>
           <ul class="liste" id="fplo-dok"></ul>
-          <p class="klar">Die Fplo für den Dienst aus DiLoc an die Fahrplananzeige teilen; sie gilt 24 Stunden und verschwindet dann von selbst, denn Fplo ändern sich oft täglich. Die Ersatzfahrpläne (Efpl-Hefte) nur einmal teilen; sie bleiben auf diesem Gerät, bis du sie entfernst. Der Fahrplan entsteht aus beiden: Strecke, km und Geschwindigkeit aus dem Heft, die Zeiten aus der Fplo. Welche Betriebsstellen nicht zugeordnet werden konnten, steht danach im Bericht.</p>
         </details>
       </div>
       <div class="gruppe" id="installieren" hidden>
         <span class="gl">Als App auf diesem Gerät</span>
         <div class="reihe"><button class="knopf haupt" type="button" id="installieren-knopf">Als App installieren</button></div>
-        <p class="klar">Danach startet die Anzeige vom Startbildschirm, auch ohne Netz, und steht im Teilen-Menü: PDF in EIRE öffnen, teilen, Fahrplan wählen.</p>
       </div>
       <div class="gruppe">
         <span class="gl">Blattfahrplan aus der EBuLa-Rückfallebene</span>
@@ -484,16 +478,14 @@ details[open] > summary::after{transform:rotate(90deg)}
           <label class="knopf haupt dateiknopf" for="datei">PDF auswählen<input type="file" id="datei" accept="application/pdf,.pdf"></label>
           <button class="knopf weg" type="button" id="sitzung-weg" hidden>Fahrplan und La löschen</button>
         </div>
-        <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Gelesen werden die zweispaltige und die einspaltige Ausgabe. Fahrplan und La liegen nur im Speicher dieses Tabs und sind weg, sobald er geschlossen wird.</p>
       </div>
-      <div class="gruppe" id="auto-geraet">
+      <div class="gruppe" id="auto-geraet" hidden>
         <span class="gl">Vom Gerät übernehmen</span>
-        <div class="reihe" id="auto-ordnerreihe" hidden>
+        <div class="reihe">
           <button class="knopf" type="button" id="auto-ordner">Ordner wählen</button>
           <button class="knopf weg" type="button" id="auto-ordner-weg" hidden>Ordner vergessen</button>
           <span class="klar" id="auto-ordnername"></span>
         </div>
-        <p class="klar" id="auto-geraet-text">Teilen: die Anzeige einmal zum Startbildschirm hinzufügen, dann steht sie im Teilen-Menü. PDF im Portal öffnen, teilen, Fahrplananzeige wählen — sie liest sie sofort. Ordner: den Ordner wählen, in den die PDF geladen werden; die Anzeige nimmt beim Start und beim Zurückwechseln die jüngste PDF daraus. Dateien, deren Name mit „la“ beginnt, bleiben dabei liegen.</p>
       </div>
       <div class="meldung" id="auto-meldung" role="status" hidden></div>
       <div class="meldung" id="lade-meldung" role="status" hidden></div>
@@ -513,7 +505,6 @@ details[open] > summary::after{transform:rotate(90deg)}
       <div class="gruppe"><span class="gl">Halte, von unten nach oben</span>
         <div class="haltekopf" aria-hidden="true"><span>Betriebsstelle</span><span class="zt">An</span><span class="zt">Ab</span></div>
         <ul class="liste umgekehrt halte" id="halteliste"></ul>
-        <p class="klar">Das Zeichen vor der Ankunftszeit steht so im Blattfahrplan.</p>
       </div>
     </section>
 
@@ -531,7 +522,6 @@ details[open] > summary::after{transform:rotate(90deg)}
           <label class="knopf haupt dateiknopf" for="la-datei">La-PDF auswählen<input type="file" id="la-datei" accept="application/pdf,.pdf" multiple></label>
           <button class="knopf weg" type="button" id="la-weg" hidden>La entfernen</button>
         </div>
-        <p class="klar">Die PDF wird auf diesem Gerät gelesen und nicht hochgeladen. Eingeordnet wird nach Betriebsstellen und km des geladenen Fahrplans.</p>
       </div>
       <div class="meldung" id="la-meldung" role="status" hidden></div>
       <div class="gruppe" id="la-geladen" hidden>
@@ -552,7 +542,7 @@ details[open] > summary::after{transform:rotate(90deg)}
         <div class="gruppe zeilen" id="la-alle"></div>
       </details>
       <details class="gruppe" id="la-ausgruppe" hidden>
-        <summary class="gl" id="la-austitel">Nur Gegengleis, mit GW</summary>
+        <summary class="gl" id="la-austitel">Nur Gegengleis</summary>
         <div class="gruppe zeilen" id="la-aus"></div>
       </details>
       <div class="gruppe" id="la-hinweisgruppe" hidden>
@@ -606,7 +596,6 @@ details[open] > summary::after{transform:rotate(90deg)}
           <button class="knopf" type="button" id="v-null">Auf 0 setzen</button>
           <button class="knopf" type="button" id="t-pause" aria-pressed="false">Marker anhalten</button>
         </div>
-        <p class="klar">Mit ▲ und ▼ setzt du den Marker auf die Zeile, an der der Zug gerade ist. Die Verspätung ergibt sich daraus.</p>
       </div>
       <div class="gruppe">
         <span class="gl" id="gl-anzeige">Anzeige</span>
@@ -8783,14 +8772,13 @@ function laZeileHtml(E, i) {
   }
   if (t.st === 'alt') kl.push('alt');
   if (t.st === 'vorbei' || t.st === 'spaeter') kl.push('ruht');
-  var T = laSicht(e), nGg = e.teile.length - T.length, gelt = laGleich(T, function (x) { return x.geltung; }), grund = laGleich(T, laGrund), max = 4, k, zus = [];
+  var T = laSicht(e), gelt = laGleich(T, function (x) { return x.geltung; }), grund = laGleich(T, laGrund), max = 4, k, zus = [];
   var tx = '<span class="la-inhalt"><b>' + (e.neu ? '+ ' : '') + nr + '</b>' + (t.sicher ? '' : '<span class="la-q" title="Einordnung unsicher">?</span>') + ' <span class="la-str">' + esc(t.B.nr + t.B.ri) + '</span>' + (T.length ? ' · ' + laTeil(T[0], gelt === null, grund === null) : '');
   for (k = 1; k < T.length && k < max; k++) tx += '<span class="la-zus">' + laTeil(T[k], gelt === null, grund === null) + '</span>';
   if (T.length > max) tx += '<span class="la-zus">+ ' + (T.length - max) + ' weitere Angaben, antippen</span>';
   if (gelt) zus.push('<span class="la-gelt">' + laGeltHtml(gelt) + '</span>');
   if (grund) zus.push(laGrundHtml(T[0]));
   if (zus.length) tx += '<span class="la-zus">' + zus.join(' · ') + '</span>';
-  if (nGg) tx += '<span class="la-zus">+ ' + nGg + (nGg === 1 ? ' Angabe' : ' Angaben') + ' nur für das Gegengleis, mit GW</span>';
   tx += '</span>';
   var w = t.w || TagesLa.fensterAm(e, Date.now()), f = w.f, fr = laFrist(e, d, w);
   if (t.st === 'vorbei') tx += '<span class="la-zus la-gelt">außer Kraft seit ' + esc(f && f.bis ? f.bis.text : e.ausserKraft.text) + '</span>';
@@ -8884,7 +8872,7 @@ function tick() {
     teile.push('<span class="erm' + (s.erm.la ? ' ist-la' : '') + '">▼ ' + (s.erm.la ? 'La ' : '') + s.erm.v + ' km/h' + (s.erm.frag ? ' ?' : '') + (kme ? ' · km ' + esc(kme) : '') + '</span>');
   }
   if (s.halt !== null && !sichtbar(s.halt)) { var Eh = Z[s.halt]; teile.push('<span>Halt ' + sym(nameVon(Eh)) + ' · ' + (Eh.an && Eh.an.halt ? esc(Eh.an.halt) : '') + fmtPlanZeit(Eh.tAn) + '</span>'); }
-  $('st-oben').innerHTML = teile.length ? teile.join('') : '<span class="leer">Nächste Ermäßigung und nächster Halt sind im Bild</span>';
+  $('st-oben').innerHTML = teile.join('');
 
   $('su-modus').textContent = modus === 'hand' ? 'Manuell' : modus === 'ort' ? ortStatus() : pause ? 'Marker angehalten' : 'Zeit-Automatik';
   /* von Hand und in der Ortung keine Verspätung, wenn der Abschnitt keine Zeiten hat oder der Fahrplan nicht für heute gilt */
@@ -8911,7 +8899,7 @@ function zeigeChips(t) {
     laAlt = alte.map(function (d) { return d.bereich; }).join(',');
     var einTag = laDocs.every(function (d) { return d.tagMs === laDocs[0].tagMs; });
     if (alte.length) laTxt = 'La ' + alte.map(function (d) { return d.bereich + ' vom ' + fmtTag(d.tagMs); }).join(', ') + ' gilt nicht für heute';
-    else laTxt = 'La ' + (einTag ? fmtTag(laDocs[0].tagMs) + ' ' + laDocs.map(function (d) { return d.bereich; }).join(', ') : laDocs.map(function (d) { return d.bereich + ' ' + fmtTag(d.tagMs); }).join(', ')) + (laZu && laZahl().off ? ' · ' + laZahl().off + ' offen' : '') + (laAus.n ? ' · ' + laAus.n + ' nur mit GW' : '');
+    else laTxt = 'La ' + (einTag ? fmtTag(laDocs[0].tagMs) + ' ' + laDocs.map(function (d) { return d.bereich; }).join(', ') : laDocs.map(function (d) { return d.bereich + ' ' + fmtTag(d.tagMs); }).join(', ')) + (laZu && laZahl().off ? ' · ' + laZahl().off + ' offen' : '');
   }
   var stand = [ausser, txt, gw, laTxt, laAlt].join('|');
   if (stand === chipsStand) return;
@@ -8953,9 +8941,7 @@ function fuelleFsd() {
 }
 function fuelleLw() {
   var alt = plan.bloecke.slice(1);
-  $('lw-text').textContent = alt.length
-    ? 'Die PDF enthält ' + alt.length + ' Alternativwege. Ein Alternativweg wird als eigener Abschnitt gezeigt, vom Abzweig bis zur Einmündung, ohne Fahrzeiten. Der Marker läuft dort von Hand.'
-    : 'Dieser Fahrplan enthält keine Alternativwege.';
+  $('lw-text').textContent = alt.length ? '' : 'Keine Alternativwege.';
   var h = '<button class="wahl" type="button" data-block="0"' + (akt === 0 ? ' aria-current="true"' : '') + '><b>Regelweg</b><span>' + plan.bloecke[0].zeilen.length + ' Zeilen</span></button>';
   alt.forEach(function (B, k) {
     var ziel = B.ziel ? (B.ziel.typ === 'regel' ? 'Einmündung auf Regelweg' : 'Einmündung auf Alternativweg ' + B.ziel.name) : 'Ende ohne Einmündung';
@@ -8972,7 +8958,7 @@ function fuelleLa() {
   $('la-docs').innerHTML = laDocs.map(function (d) {
     var zus = [];
     if (!laGueltig(d, echt)) zus.push('gilt nicht für heute');
-    if (!d.voll) zus.push('aus dem Speicher dieses Tabs, nur die La-Strecken dieses Fahrplans');
+    if (!d.voll) zus.push('nur die La-Strecken dieses Fahrplans');
     if (d.nWarn) zus.push(d.nWarn + (d.nWarn === 1 ? ' Stelle' : ' Stellen') + ' nicht sicher gelesen');
     if (d.unbekannt) zus.push(d.unbekannt + ' Zeichen nicht erkannt');
     d.hinweise.forEach(function (z) { hin.push('<li class="block"><span>' + esc(z) + '</span></li>'); });
@@ -8982,16 +8968,11 @@ function fuelleLa() {
   $('la-hinweise').innerHTML = hin.join('');
   var wg = $('la-weggruppe'), og = $('la-offengruppe'), ag = $('la-allegruppe'), xg = $('la-ausgruppe');
   if (!laDocs.length) { wg.hidden = true; og.hidden = true; ag.hidden = true; xg.hidden = true; return; }
-  wg.hidden = false;
-  if (!plan || !laZu) {
-    $('la-wegtitel').textContent = 'Auf dem Laufweg';
-    $('la-wegtext').textContent = 'Eingeordnet wird, sobald ein Fahrplan aus einer PDF geladen ist.';
-    $('la-strecken').innerHTML = ''; og.hidden = true; ag.hidden = true; xg.hidden = true; return;
-  }
+  wg.hidden = !plan || !laZu;
+  if (wg.hidden) { og.hidden = true; ag.hidden = true; xg.hidden = true; return; }
   var B = plan.bloecke[akt], lz = laZahl(), n = lz.ein, frag = laZu.eintraege.filter(function (t) { return !t.sicher && !t.aus; }).length;
   $('la-wegtitel').textContent = B.typ === 'regel' ? 'Auf dem Regelweg' : 'Im Alternativweg ' + B.name;
-  $('la-wegtext').textContent = n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (frag ? ', davon ' + frag + ' mit Fragezeichen' : '') + '. ' +
-    (lz.off ? lz.off + ' nicht eingeordnet, siehe unten. ' : '') + (laAus.n ? laAus.n + (laAus.n === 1 ? ' Eintrag gilt nur für das Gegengleis und erscheint' : ' Einträge gelten nur für das Gegengleis und erscheinen') + ' mit der Taste GW. ' : '') + 'Erfasst sind nur die geladenen La-Bereiche und darin nur La-Strecken, von denen eine Betriebsstelle im Fahrplan steht. Prüfe die Liste gegen deine La-Strecken.';
+  $('la-wegtext').textContent = n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (frag ? ', davon ' + frag + ' unsicher' : '') + (lz.off ? ', ' + lz.off + ' nicht eingeordnet' : '') + '.';
   $('la-strecken').innerHTML = laZu.strecken.map(function (x) {
     return '<li><span><b>' + esc(x.bereich + ' ' + x.nr) + '</b>' + (x.gesichert ? '' : ' ?') + ' · ' + esc(x.name.length > 90 ? x.name.slice(0, 88) + ' …' : x.name) + '</span><span class="num">' + x.anzahl + '</span></li>';
   }).join('');
@@ -9005,7 +8986,7 @@ function fuelleLa() {
   $('la-alletitel').textContent = 'Eingeordnete Einträge (' + n + '), in Fahrtrichtung';
   $('la-alle').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? '' : knopf(t, k, 'eintrag', t.sicher ? '' : t.hinweis); }).join('');
   xg.hidden = !laAus.n;
-  $('la-austitel').textContent = 'Nur Gegengleis, mit GW (' + laAus.n + ')';
+  $('la-austitel').textContent = 'Nur Gegengleis (' + laAus.n + ')';
   $('la-aus').innerHTML = laZu.eintraege.map(function (t, k) { return t.aus ? knopf(t, k, 'eintrag', '') : ''; }).join('') +
     laZu.offen.map(function (o, k) { return o.aus ? knopf(o, k, 'offen', 'nicht eingeordnet') : ''; }).join('');
 }
@@ -9052,7 +9033,7 @@ function zeigeLaEintrag(t, zurueck) {
 function maleLaSeite(d, e) {
   var bild = $('e-bild'), text = $('e-text'), wrap = $('e-wrap'), lauf = ++laLauf;
   if (!d.pdf) { wrap.hidden = true; text.textContent = 'Die Originalseite steht nur zur Verfügung, solange die La-PDF in dieser Sitzung geladen ist.'; return; }
-  wrap.hidden = false; text.textContent = 'Original aus der La-PDF, Seite ' + e.seite + '. Der Eintrag ist am Rand markiert. Diese Seite gilt, nicht die Anzeige.';
+  wrap.hidden = false; text.textContent = 'La-PDF, Seite ' + e.seite;
   d.pdf.getPage(e.seite).then(function (page) {
     if (lauf !== laLauf) return;
     var v1 = page.getViewport({ scale: 1 }), cssW = Math.max(620, Math.min($('blatt-eintrag').clientWidth - 32, 900)), dpr = Math.min(window.devicePixelRatio || 1, 2), sc = cssW * dpr / v1.width;
@@ -9075,7 +9056,7 @@ function maleOrig(nr) {
   $('o-vor').disabled = !liste.some(function (x) { return x.nr === nr - 1; });
   $('o-nach').disabled = !liste.some(function (x) { return x.nr === nr + 1; });
   if (!pdfDoc || !info) { $('o-wrap').hidden = true; text.textContent = 'Die Originalseite steht nur zur Verfügung, solange die PDF in dieser Sitzung geladen ist. Lade die PDF über „Zug“ erneut.'; return; }
-  $('o-wrap').hidden = false; text.textContent = 'Original aus der PDF. Diese Seite gilt, nicht die Anzeige.';
+  $('o-wrap').hidden = false; text.textContent = '';
   var lauf = ++origLauf;
   pdfDoc.getPage(info.pdf).then(function (page) {
     if (lauf !== origLauf) return;
@@ -9092,10 +9073,8 @@ function zeigeModus() {
   $('m-hand').disabled = false;
   $('m-zeit').disabled = !zeitMoeglich;
   $('m-ort').disabled = !ortMoeglich();
-  $('m-text').textContent = zeitMoeglich ? 'Zeit-Automatik führt den Marker nach den Fahrzeiten, zwischen zwei Zeiten gleichmäßig über die Zeilen. Manuell bleibt er, wo du ihn mit ▲ und ▼ hinsetzt; die Verspätung zählt dann gegen die Sollzeit dieser Zeile.' : 'Dieser Abschnitt hat keine Fahrzeiten. Der Marker wird mit ▲ und ▼ geführt.';
-  var I = ortAchse && ortAchse.info;
-  $('ort-text').textContent = !ortMoeglich() ? 'Ortung: Für diesen Abschnitt wurden zu wenige Betriebsstellen mit Koordinaten gefunden.'
-    : 'Ortung führt den Marker nach dem GPS-Standort des Geräts: Wegmessung von Punkt zu Punkt, Abgleich an ' + I.anker + ' Betriebsstellen mit bekannten Koordinaten (größte Lücke ' + fmtKm(I.luecke / 1000) + ' km, ' + I.wo + '). Die Verspätung ergibt sich aus Standort und Uhr. Ohne Empfang läuft der Marker nach der Zeit weiter. ▲ und ▼ setzen den Standort von Hand.';
+  $('m-text').textContent = zeitMoeglich ? '' : 'Dieser Abschnitt hat keine Fahrzeiten.';
+  $('ort-text').textContent = ortMoeglich() ? '' : 'Für diesen Abschnitt ist keine Ortung möglich.';
   $('t-pause').disabled = modus !== 'zeit';
   $('t-pause').setAttribute('aria-pressed', String(pause));
   $('t-pause').textContent = pause ? 'Marker läuft weiter' : 'Marker anhalten';
@@ -9252,7 +9231,7 @@ function ladeDatei(datei) {
     speichere();
     speichereLa();
     var w = (p.warnungen || []).length;
-    meldung('Fahrplan geladen. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' konnte ich nicht sicher zuordnen, siehe Liste unten. ' : '') + laKurz());
+    meldung('Fahrplan geladen. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' nicht sicher gelesen, siehe unten. ' : '') + laKurz());
     zeigeBericht();
     return true;
   }).catch(function (e) {
@@ -9264,10 +9243,10 @@ function ladeDatei(datei) {
 
 /* ---------- Tages-La laden ---------- */
 function laKurz() {
-  if (!laDocs.length) return 'La ist nicht geladen und wird nicht angezeigt.';
+  if (!laDocs.length) return 'La nicht geladen.';
   if (!laZu) return 'La geladen.';
   var lz = laZahl(), n = lz.ein, o = lz.off;
-  return 'La: ' + n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (o ? ', ' + o + ' nicht eingeordnet (Taste La)' : '') + (laAus.n ? ', ' + laAus.n + ' nur für das Gegengleis (Taste GW)' : '') + '.';
+  return 'La: ' + n + (n === 1 ? ' Eintrag' : ' Einträge') + ' eingeordnet' + (o ? ', ' + o + ' nicht eingeordnet' : '') + '.';
 }
 function planKennung() { return plan ? [plan.datei, plan.kopf.zug, plan.kopf.datumText, plan.bloecke[0].zeilen.length].join('|') : ''; }
 /* Gespeichert werden nur die La-Strecken, die den geladenen Fahrplan berühren */
@@ -9321,7 +9300,7 @@ function ladeLa(dateien) {
     });
     laDocs.sort(function (a, b) { return BEREICHE.indexOf(a.bereich) - BEREICHE.indexOf(b.bereich); });
     if (neu.length) { laGeaendert(); speichereLa(); }
-    var text = neu.length ? neu.map(function (r) { return 'La-Bereich ' + r.bereich + ' gelesen'; }).join(', ') + '. ' + (!plan ? 'Eingeordnet wird, sobald ein Fahrplan geladen ist.' : laKurz()) : '';
+    var text = neu.length ? neu.map(function (r) { return 'La-Bereich ' + r.bereich + ' gelesen'; }).join(', ') + '.' + (plan ? ' ' + laKurz() : '') : '';
     laMeldung((text + ' ' + fehler.join(' ')).trim());
     fuelleLa();
     return neu.map(function (r) { return r.datei; });
@@ -9592,7 +9571,7 @@ function fploZeige() {
         + '<span>' + esc('Fplo ' + (z.d.F.name || z.d.name) + ', ' + z.Z.abschnitt + ' · ' + wann + (z.Z.mbr.length ? ' · Mbr ' + z.Z.mbr[0].mbr : '')) + '</span>'
         + '<span>' + esc(z.fehlt.length ? 'Es fehlen die Ersatzfahrpläne ' + z.fehlt.join(', ') : 'Ersatzfahrpläne ' + fploHefte(z.Z).join(', ') + ' vorhanden') + '</span></button>';
     }).join('');
-    if (!fplos.length) fploMeldung(hefte.length ? 'Keine Fplo da. Braucht der Dienst eine, die aktuelle Fplo aus DiLoc an die Fahrplananzeige teilen.' : '');
+    if (!fplos.length) fploMeldung(hefte.length ? 'Keine Fplo gespeichert.' : '');
     else if (!zeilen.length) fploMeldung(such ? 'Kein Zug ' + such + ' in den gespeicherten Fplo.' : 'Am ' + tagText(tag) + ' fährt laut den gespeicherten Fplo kein Zug. Zugnummer eingeben, um alle zu sehen.');
     else fploMeldung('');
   });
@@ -9622,7 +9601,7 @@ function fploBaue(schluessel, ai) {
     speichereLa();
     var w = (p.warnungen || []).length;
     fploMeldung('Zug ' + Z.zug + ' am ' + tagText(tag) + ' gebaut: ' + r.abschnitte.length + ' Heftabschnitte, ' + r.zeiten + ' Zeiten.' + (tag !== gewaehlt ? ' Am ' + tagText(gewaehlt) + ' fährt er laut Fplo nicht.' : ''));
-    meldung('Fahrplan aus Fplo und Ersatzfahrplan. Maßgebend bleiben Fplo und Heft. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' konnte ich nicht sicher zuordnen, siehe Liste unten. ' : '') + laKurz());
+    meldung('Fahrplan aus Fplo und Ersatzfahrplan geladen. ' + (w ? w + (w === 1 ? ' Stelle' : ' Stellen') + ' nicht sicher gelesen, siehe unten. ' : '') + laKurz());
     zeigeBericht();
   })['catch'](function (e) { fploMeldung('Der Fahrplan ließ sich nicht bauen' + (e && e.message ? ': ' + String(e.message).replace(/\.?\s*$/, '.') : '.') + ' Teile Fplo und Ersatzfahrpläne noch einmal aus DiLoc und tippe den Zug erneut an.'); })
     .then(function () { fploLaeuft = false; });
@@ -9718,8 +9697,8 @@ function griffHolen() {
   })['catch'](function () { return null; });
 }
 function ordnerZeige() {
-  var r = $('auto-ordnerreihe'), n = $('auto-ordnername'), w = $('auto-ordner-weg');
-  if (r) r.hidden = !window.showDirectoryPicker;
+  var n = $('auto-ordnername'), w = $('auto-ordner-weg');
+  $('auto-geraet').hidden = NATIV || !window.showDirectoryPicker;
   if (n) n.textContent = ordnerGriff ? 'Gewählt: ' + ordnerGriff.name : '';
   if (w) w.hidden = !ordnerGriff;
 }
@@ -9781,7 +9760,6 @@ function ordnerSchau(stumm) {
    Die App beantwortet eire/suche und eire/pdf selbst und spricht dafür mit EIRE; eine
    Webseite im Browser darf das nicht. Ohne window.FahrplanNativ bleibt alles verborgen. */
 var NATIV = !!window.FahrplanNativ;
-var EIRE_ANSICHT = 'fahrplananzeige.eire.ansicht';
 var eireTreffer = [], eireDatumGesucht = '', eireLaeuft = false;
 /* Bildschirm wach: der WebView kann es nicht verlässlich, die App schon */
 if (NATIV) {
@@ -9840,7 +9818,6 @@ function eireSuche(code) {
   if (eireLaeuft) return;
   var zug = $('eire-zug').value.trim(), datum = $('eire-datum').value || heuteIso();
   if (!/^(0|[1-9][0-9]{0,11})$/.test(zug)) { eireMeldung('Zugnummer: nur Ziffern, ohne führende Null.'); $('eire-zug').focus(); return; }
-  try { localStorage.setItem(EIRE_ANSICHT, $('eire-ansicht').value); } catch (e) {}
   eireLaeuft = true; $('eire-suche').disabled = true;
   $('eire-ergebnis').hidden = true; $('eire-ergebnis').innerHTML = '';
   eireMeldung('Frage EIRE nach Zug ' + zug + ' am ' + datumDeutsch(datum) + ' \u2026');
@@ -9881,14 +9858,14 @@ function eireZeige(liste, zug, datum) {
   $('eire-ergebnis').innerHTML = (gesamt.length ? '<span class="gl">Gesamtblattfahrpläne</span>' + gesamt.join('') : '')
     + (einzel.length ? '<span class="gl">Einzelblattfahrpläne</span>' + einzel.join('') : '');
   $('eire-ergebnis').hidden = false;
-  eireMeldung(eireTreffer.length === 1 ? 'Ein Fahrplan gefunden. Antippen zum Laden.' : eireTreffer.length + ' Fahrpläne gefunden. Den passenden antippen.');
+  eireMeldung(eireTreffer.length === 1 ? 'Ein Fahrplan gefunden.' : eireTreffer.length + ' Fahrpläne gefunden.');
 }
 function eireLade(i) {
   var t = eireTreffer[i];
   if (!t || eireLaeuft) return;
   eireLaeuft = true;
   eireMeldung('Lade ' + (t.trainNumber || 'Fahrplan') + ' \u2026');
-  fetch('eire/pdf?id=' + encodeURIComponent(t.id) + '&datum=' + encodeURIComponent(eireDatumGesucht) + '&zweispaltig=' + encodeURIComponent($('eire-ansicht').value), { cache: 'no-store' })
+  fetch('eire/pdf?id=' + encodeURIComponent(t.id) + '&datum=' + encodeURIComponent(eireDatumGesucht), { cache: 'no-store' })
     .then(function (a) {
       if (!a.ok) return eireJson(a).then(function (r) { eireFehler(r.daten, r.status); });
       var name = a.headers.get('X-Dateiname') || ('EIRE_' + (t.trainNumber || '') + '.pdf');
@@ -10039,8 +10016,8 @@ function ortStatus() {
   var o = ortung, t = Date.now(), nachZeit = zeitMoeglich ? ' · Marker nach Zeit' : '';
   if (!o || !o.punkte) return (ortUngenau ? 'Ortung · Standort zu ungenau' : 'Ortung · warte auf Standort') + nachZeit;
   if (o.alter(t) > 30) return 'Ortung · kein Empfang seit ' + fmtDauer(o.alter(t)) + nachZeit;
-  if (o.art === null || o.art === 'start') return 'Ortung · noch kein Bezug zum Laufweg' + nachZeit;
-  if (o.art === 'neu') return 'Ortung · grob, noch kein Abgleich';
+  if (o.art === null || o.art === 'start') return 'Ortung' + nachZeit;
+  if (o.art === 'neu') return 'Ortung · grob';
   if (o.art === 'hand') return 'Ortung · von Hand gesetzt';
   return 'Ortung · ' + o.name + (o.seit >= 950 ? ' · seit ' + fmtKm(o.seit / 1000) + ' km' : '');
 }
@@ -10157,7 +10134,6 @@ if (NATIV) {
   $('eire-zugang-ok').addEventListener('click', eireZugangSpeichern);
   $('eire-passwort').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); eireZugangSpeichern(); } });
   $('eire-zugang-weg').addEventListener('click', eireZugangLoeschen);
-  $('eire-ansicht').addEventListener('change', function () { try { localStorage.setItem(EIRE_ANSICHT, this.value); } catch (e) {} });
   $('eire-ergebnis').addEventListener('click', function (ev) { var b = ev.target.closest('[data-eire]'); if (b) eireLade(Number(b.dataset.eire)); });
 }
 $('auto-ordner-weg').addEventListener('click', ordnerVergessen);
@@ -10239,7 +10215,6 @@ fploZeige()['catch'](function () {});
   $('eire').hidden = false;
   ['auto-geraet', 'installieren'].forEach(function (id) { var el = $(id); if (el) el.hidden = true; });
   $('eire-datum').value = heuteIso();
-  try { var ansicht = localStorage.getItem(EIRE_ANSICHT); if (ansicht === '0' || ansicht === '1') $('eire-ansicht').value = ansicht; } catch (e) {}
   try { $('eire-fassung').textContent = 'App-Fassung ' + FahrplanNativ.version() + '.'; } catch (e) {}
   eireZugangZeige();
   nativGeteilt();
